@@ -242,6 +242,7 @@ emptyMachine =
 createMachine : String -> Result CompilerError GMachine
 createMachine source = compile source
   |> Result.andThen (\env -> case Dict.get "main" env of
+    -- set up the stack and heap with a node for the main function for evaluation
     Just mainFunction ->
       if mainFunction.numFormals /= 0
       then Err MainFunctionCannotHaveFormals
