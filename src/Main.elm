@@ -213,33 +213,42 @@ flipLayout layout =
       flipCoordAcrossAvg (x, y) = (2 * avg - x, y)
   in { layout | coordDict=Dict.map (always flipCoordAcrossAvg) layout.coordDict}
 
-{-| scale the layout to fit within the dimensions -}
+{-| scale the layout to fit the new dimensions -}
 fitLayout : Float -> Float -> D.GraphLayout -> D.GraphLayout
-fitLayout width height layout =
-  let scaleX = width / layout.width
-      scaleY = height / layout.height
+fitLayout w h layout =
+  let
+      scaleX = w / layout.width
+      scaleY = h / layout.height
+      scale (x_, y_) = (scaleX * x_, scaleY * y_)
   in { layout
-    | width=layout.width * scaleX
-    , height=layout.height * scaleY
-    , coordDict=Dict.map (\_ (x,y) -> (scaleX * x, scaleY * y)) layout.coordDict
+    | width=w
+    , height=h
+    , coordDict=Dict.map (always scale) layout.coordDict
     }
+
+translateLayout : Float -> Float -> D.GraphLayout -> D.GraphLayout
+translateLayout dx dy layout =
+  { layout | coordDict=Dict.map (\_ (x,y) -> (x + dx, y + dy)) layout.coordDict }
 
 drawMachine : G.GMachine -> Svg msg
 drawMachine machine =
-  let layout = flipLayout <| runLayout machine.graph
-      stackWidth = Dict.values layout.coordDict
-        |> List.map Tuple.first
-        |> List.minimum
-        |> Maybe.withDefault 5
-        |> (*) 0.5
+  let
+    width = 100
+    height = 100
+    stackWidthPct = 0.15 -- pct of width to be taken up by stack
+    layout = runLayout machine.graph
+        |> flipLayout
+        |> fitLayout ((1 - stackWidthPct) * width) height
+        |> translateLayout (stackWidthPct * width) 0
+
   in Svg.svg
-    [ SvgA.viewBox 0 0 layout.width layout.height
+    [ SvgA.viewBox 0 0 width height
     , Html.Attributes.style "height" "100%"
     , Html.Attributes.style "width" "100%"
     , Html.Attributes.style "border" "solid"
     ]
     [ drawGraph machine.graph layout
-    , drawStack machine layout stackWidth
+    , drawStack machine layout (stackWidthPct * width)
     ]
 
 
