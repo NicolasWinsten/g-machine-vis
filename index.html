@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>G-Machine | Nicolas Winsten</title>
+    <meta name="description" content="Write a supercombinator program and watch its runtime on the G-Machine">
+
+    <style>
+      *::-webkit-scrollbar {
+        width: 5px;
+      }
+
+      *::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0);
+      }
+
+      *::-webkit-scrollbar-thumb {
+        background-color: rgb(0, 0, 0);
+        border-radius: 0px;
+      }
+    </style>
+
+</head>
+<body>
+    <div id="app"></div>
+    <script src="app.js"></script>
+    <script>
+        let app = Elm.Main.init({node : document.getElementById("app")})
+    </script>
+</body>
+</html>
