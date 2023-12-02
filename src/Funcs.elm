@@ -7,3 +7,4 @@ applyN f num initial = if num <= 0 then initial else applyN f (num - 1) (f initi
 
 when : Bool -> (a -> a) -> a -> a
 when cond f x = if cond then f x else x
+

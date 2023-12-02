@@ -20,7 +20,8 @@ type GCode
   | UNWIND
   | UPDATE Int
   | POP Int
-  | PUSH Int
+  | PUSHARG Int
+  | PUSHLOCAL Int
   | MKAP
   | SLIDE Int
 
@@ -61,6 +62,7 @@ compile source = parse source
   |> Result.andThen compileASTs
 
 {-| mapping of formal parameters to their position on the stack
+  (where the base of the stack is position 0)
 -}
 type alias FormalMapping = Dict Name Int
 
@@ -71,6 +73,7 @@ formalsToStackPosition formals =
   let num = List.length formals
   in List.indexedMap (\i name -> (name, num - i)) formals
       |> Dict.fromList
+
 
 getStackPos : Name -> FormalMapping -> Maybe Int
 getStackPos name mapping = Dict.get name mapping
@@ -94,7 +97,13 @@ compileInstantiation : SCExpr -> FormalMapping -> Context -> List GCode
 compileInstantiation e mapping context = case e of
     SCIdent name -> case getStackPos name mapping of
       -- if the name is a formal parameter, push a pointer to it onto the stack
-      Just offset -> [PUSH (context - offset)]
+      Just offset ->
+        let numArgs = Dict.size mapping
+        in
+        if offset <= numArgs
+        then [PUSHARG (context - offset)]
+        else [PUSHLOCAL (context - offset)] -- TODO when is this instruction ever compiled?
+
       -- otherwise, assume it is a global function
       Nothing -> [PUSHGLOBAL name]
     

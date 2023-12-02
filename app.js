@@ -10828,11 +10828,14 @@ var $author$project$Backend$ALLOC = function (a) {
 	return {$: 'ALLOC', a: a};
 };
 var $author$project$Backend$MKAP = {$: 'MKAP'};
-var $author$project$Backend$PUSH = function (a) {
-	return {$: 'PUSH', a: a};
+var $author$project$Backend$PUSHARG = function (a) {
+	return {$: 'PUSHARG', a: a};
 };
 var $author$project$Backend$PUSHGLOBAL = function (a) {
 	return {$: 'PUSHGLOBAL', a: a};
+};
+var $author$project$Backend$PUSHLOCAL = function (a) {
+	return {$: 'PUSHLOCAL', a: a};
 };
 var $author$project$Backend$SLIDE = function (a) {
 	return {$: 'SLIDE', a: a};
@@ -10870,9 +10873,13 @@ var $author$project$Backend$compileInstantiation = F3(
 				var _v2 = A2($author$project$Backend$getStackPos, name, mapping);
 				if (_v2.$ === 'Just') {
 					var offset = _v2.a;
-					return _List_fromArray(
+					var numArgs = $elm$core$Dict$size(mapping);
+					return (_Utils_cmp(offset, numArgs) < 1) ? _List_fromArray(
 						[
-							$author$project$Backend$PUSH(context - offset)
+							$author$project$Backend$PUSHARG(context - offset)
+						]) : _List_fromArray(
+						[
+							$author$project$Backend$PUSHLOCAL(context - offset)
 						]);
 				} else {
 					return _List_fromArray(
@@ -17993,6 +18000,7 @@ var $author$project$GMachine$GApp = F2(
 		return {$: 'GApp', a: a, b: b};
 	});
 var $author$project$GMachine$GHole = {$: 'GHole'};
+var $author$project$GMachine$MissingArgument = {$: 'MissingArgument'};
 var $author$project$GMachine$OutOfBoundsStack = {$: 'OutOfBoundsStack'};
 var $author$project$GMachine$UnexpectedHole = {$: 'UnexpectedHole'};
 var $author$project$GMachine$UnknownName = function (a) {
@@ -18032,6 +18040,75 @@ var $author$project$GMachine$getArg = function (node) {
 		return $elm$core$Maybe$Nothing;
 	}
 };
+var $elm$core$List$head = function (list) {
+	if (list.b) {
+		var x = list.a;
+		var xs = list.b;
+		return $elm$core$Maybe$Just(x);
+	} else {
+		return $elm$core$Maybe$Nothing;
+	}
+};
+var $elm_community$list_extra$List$Extra$getAt = F2(
+	function (idx, xs) {
+		return (idx < 0) ? $elm$core$Maybe$Nothing : $elm$core$List$head(
+			A2($elm$core$List$drop, idx, xs));
+	});
+var $elm$core$Result$map = F2(
+	function (func, ra) {
+		if (ra.$ === 'Ok') {
+			var a = ra.a;
+			return $elm$core$Result$Ok(
+				func(a));
+		} else {
+			var e = ra.a;
+			return $elm$core$Result$Err(e);
+		}
+	});
+var $author$project$GMachine$NodeDoesNotExist = function (a) {
+	return {$: 'NodeDoesNotExist', a: a};
+};
+var $author$project$GMachine$retrieveNode = F2(
+	function (gmachine, node) {
+		return A2(
+			$elm$core$Result$fromMaybe,
+			$author$project$GMachine$NodeDoesNotExist(node),
+			A2($elm$core$Dict$get, node, gmachine.graph));
+	});
+var $author$project$GMachine$peekNodeOnStack = function (gmachine) {
+	return A2(
+		$elm$core$Result$andThen,
+		$author$project$GMachine$retrieveNode(gmachine),
+		A2(
+			$elm$core$Result$fromMaybe,
+			$author$project$GMachine$EmptyStack,
+			$elm$core$List$head(gmachine.stack)));
+};
+var $author$project$GMachine$pop = F2(
+	function (num, gmachine) {
+		return _Utils_update(
+			gmachine,
+			{
+				stack: A2($elm$core$List$drop, num, gmachine.stack)
+			});
+	});
+var $author$project$GMachine$pushContextToDump = F3(
+	function (stack, code, gmachine) {
+		return _Utils_update(
+			gmachine,
+			{
+				dump: A2(
+					$elm$core$List$cons,
+					_Utils_Tuple2(stack, code),
+					gmachine.dump)
+			});
+	});
+var $author$project$GMachine$setStack = F2(
+	function (stack, gmachine) {
+		return _Utils_update(
+			gmachine,
+			{stack: stack});
+	});
 var $elm$core$List$takeReverse = F3(
 	function (n, list, kept) {
 		takeReverse:
@@ -18158,91 +18235,6 @@ var $elm$core$List$take = F2(
 	function (n, list) {
 		return A3($elm$core$List$takeFast, 0, n, list);
 	});
-var $author$project$GMachine$getArgsOnSpine = F2(
-	function (numArgs, gmachine) {
-		var argsOnSpine = A2(
-			$elm$core$List$filterMap,
-			$author$project$GMachine$getArg,
-			A2(
-				$elm$core$List$filterMap,
-				A2($elm_community$basics_extra$Basics$Extra$flip, $elm$core$Dict$get, gmachine.graph),
-				A2(
-					$elm$core$List$take,
-					numArgs,
-					A2($elm$core$List$drop, 1, gmachine.stack))));
-		return _Utils_eq(
-			$elm$core$List$length(argsOnSpine),
-			numArgs) ? $elm$core$Maybe$Just(argsOnSpine) : $elm$core$Maybe$Nothing;
-	});
-var $elm$core$List$head = function (list) {
-	if (list.b) {
-		var x = list.a;
-		var xs = list.b;
-		return $elm$core$Maybe$Just(x);
-	} else {
-		return $elm$core$Maybe$Nothing;
-	}
-};
-var $elm_community$list_extra$List$Extra$getAt = F2(
-	function (idx, xs) {
-		return (idx < 0) ? $elm$core$Maybe$Nothing : $elm$core$List$head(
-			A2($elm$core$List$drop, idx, xs));
-	});
-var $elm$core$Result$map = F2(
-	function (func, ra) {
-		if (ra.$ === 'Ok') {
-			var a = ra.a;
-			return $elm$core$Result$Ok(
-				func(a));
-		} else {
-			var e = ra.a;
-			return $elm$core$Result$Err(e);
-		}
-	});
-var $author$project$GMachine$NodeDoesNotExist = function (a) {
-	return {$: 'NodeDoesNotExist', a: a};
-};
-var $author$project$GMachine$retrieveNode = F2(
-	function (gmachine, node) {
-		return A2(
-			$elm$core$Result$fromMaybe,
-			$author$project$GMachine$NodeDoesNotExist(node),
-			A2($elm$core$Dict$get, node, gmachine.graph));
-	});
-var $author$project$GMachine$peekNodeOnStack = function (gmachine) {
-	return A2(
-		$elm$core$Result$andThen,
-		$author$project$GMachine$retrieveNode(gmachine),
-		A2(
-			$elm$core$Result$fromMaybe,
-			$author$project$GMachine$EmptyStack,
-			$elm$core$List$head(gmachine.stack)));
-};
-var $author$project$GMachine$pop = F2(
-	function (num, gmachine) {
-		return _Utils_update(
-			gmachine,
-			{
-				stack: A2($elm$core$List$drop, num, gmachine.stack)
-			});
-	});
-var $author$project$GMachine$pushContextToDump = F3(
-	function (stack, code, gmachine) {
-		return _Utils_update(
-			gmachine,
-			{
-				dump: A2(
-					$elm$core$List$cons,
-					_Utils_Tuple2(stack, code),
-					gmachine.dump)
-			});
-	});
-var $author$project$GMachine$setStack = F2(
-	function (stack, gmachine) {
-		return _Utils_update(
-			gmachine,
-			{stack: stack});
-	});
 var $author$project$GMachine$stateTransition = F2(
 	function (instruction, gmachine) {
 		var stack = gmachine.stack;
@@ -18252,7 +18244,7 @@ var $author$project$GMachine$stateTransition = F2(
 		var _v0 = _Utils_Tuple2(
 			instruction,
 			$author$project$GMachine$peekNodeOnStack(gmachine));
-		_v0$13:
+		_v0$14:
 		while (true) {
 			switch (_v0.a.$) {
 				case 'PUSHGLOBAL':
@@ -18315,7 +18307,7 @@ var $author$project$GMachine$stateTransition = F2(
 								return $elm$core$Result$Err($author$project$GMachine$UnexpectedHole);
 						}
 					} else {
-						break _v0$13;
+						break _v0$14;
 					}
 				case 'UNWIND':
 					if (_v0.b.$ === 'Ok') {
@@ -18334,32 +18326,25 @@ var $author$project$GMachine$stateTransition = F2(
 							case 'GFunc':
 								var _v9 = _v0.a;
 								var global = _v0.b.a.a;
-								var _v10 = A2($author$project$GMachine$getArgsOnSpine, global.numFormals, gmachine);
-								if (_v10.$ === 'Just') {
-									var args = _v10.a;
+								var enoughArguments = _Utils_cmp(
+									$elm$core$List$length(stack) + 1,
+									global.numFormals) > -1;
+								if (enoughArguments) {
 									return $elm$core$Result$Ok(
-										A2(
-											$author$project$GMachine$setCode,
-											global.code,
-											A2(
-												$author$project$GMachine$setStack,
-												_Utils_ap(
-													args,
-													A2($elm$core$List$drop, global.numFormals, stack)),
-												gmachine)));
+										A2($author$project$GMachine$setCode, global.code, gmachine));
 								} else {
-									var _v11 = _Utils_Tuple2(
+									var _v10 = _Utils_Tuple2(
 										$elm$core$List$reverse(stack),
 										dump);
-									if (_v11.a.b) {
-										if (_v11.b.b) {
-											var _v12 = _v11.a;
-											var redexRoot = _v12.a;
-											var _v13 = _v11.b;
-											var _v14 = _v13.a;
-											var oldStack = _v14.a;
-											var oldCode = _v14.b;
-											var dump_ = _v13.b;
+									if (_v10.a.b) {
+										if (_v10.b.b) {
+											var _v11 = _v10.a;
+											var redexRoot = _v11.a;
+											var _v12 = _v10.b;
+											var _v13 = _v12.a;
+											var oldStack = _v13.a;
+											var oldCode = _v13.b;
+											var dump_ = _v12.b;
 											return $elm$core$Result$Ok(
 												A2(
 													$author$project$GMachine$setDump,
@@ -18379,12 +18364,12 @@ var $author$project$GMachine$stateTransition = F2(
 									}
 								}
 							default:
-								var _v15 = _v0.a;
-								var _v16 = _v0.b.a;
+								var _v14 = _v0.a;
+								var _v15 = _v0.b.a;
 								return $elm$core$Result$Err($author$project$GMachine$UnexpectedHole);
 						}
 					} else {
-						break _v0$13;
+						break _v0$14;
 					}
 				case 'UPDATE':
 					if (_v0.b.$ === 'Ok') {
@@ -18404,29 +18389,54 @@ var $author$project$GMachine$stateTransition = F2(
 							},
 							nodeToReplace);
 					} else {
-						break _v0$13;
+						break _v0$14;
 					}
 				case 'POP':
 					var k = _v0.a.a;
 					return $elm$core$Result$Ok(
 						A2($author$project$GMachine$pop, k, gmachine));
-				case 'PUSH':
+				case 'PUSHLOCAL':
 					var k = _v0.a.a;
-					var _v17 = A2($elm_community$list_extra$List$Extra$getAt, k, stack);
-					if (_v17.$ === 'Just') {
-						var node = _v17.a;
+					var _v16 = A2($elm_community$list_extra$List$Extra$getAt, k, stack);
+					if (_v16.$ === 'Just') {
+						var node = _v16.a;
 						return $elm$core$Result$Ok(
 							A2($author$project$GMachine$push, node, gmachine));
 					} else {
 						return $elm$core$Result$Err($author$project$GMachine$EmptyStack);
 					}
+				case 'PUSHARG':
+					var k = _v0.a.a;
+					var arg = A2(
+						$elm$core$Result$map,
+						$author$project$GMachine$getArg,
+						A2(
+							$elm$core$Result$andThen,
+							$author$project$GMachine$retrieveNode(gmachine),
+							A2(
+								$elm$core$Result$fromMaybe,
+								$author$project$GMachine$EmptyStack,
+								A2($elm_community$list_extra$List$Extra$getAt, k + 1, stack))));
+					if (arg.$ === 'Ok') {
+						if (arg.a.$ === 'Just') {
+							var argAddr = arg.a.a;
+							return $elm$core$Result$Ok(
+								A2($author$project$GMachine$push, argAddr, gmachine));
+						} else {
+							var _v18 = arg.a;
+							return $elm$core$Result$Err($author$project$GMachine$MissingArgument);
+						}
+					} else {
+						var err = arg.a;
+						return $elm$core$Result$Err(err);
+					}
 				case 'MKAP':
-					var _v18 = _v0.a;
+					var _v19 = _v0.a;
 					if (stack.b && stack.b.b) {
 						var n1 = stack.a;
-						var _v20 = stack.b;
-						var n2 = _v20.a;
-						var stack_ = _v20.b;
+						var _v21 = stack.b;
+						var n2 = _v21.a;
+						var stack_ = _v21.b;
 						return $elm$core$Result$Ok(
 							A2(
 								$author$project$GMachine$mkNodeAndPush,
@@ -20019,9 +20029,12 @@ var $author$project$Main$gCodeToString = function (instruction) {
 		case 'POP':
 			var n = instruction.a;
 			return 'POP ' + $elm$core$String$fromInt(n);
-		case 'PUSH':
+		case 'PUSHLOCAL':
 			var i = instruction.a;
-			return 'PUSH ' + $elm$core$String$fromInt(i);
+			return 'PUSHLOCAL ' + $elm$core$String$fromInt(i);
+		case 'PUSHARG':
+			var i = instruction.a;
+			return 'PUSHARG ' + $elm$core$String$fromInt(i);
 		case 'MKAP':
 			return 'MKAP';
 		default:
@@ -27788,8 +27801,8 @@ var $author$project$Main$view = function (_v0) {
 						_Debug_todo(
 							'Main',
 							{
-								start: {line: 329, column: 66},
-								end: {line: 329, column: 76}
+								start: {line: 330, column: 66},
+								end: {line: 330, column: 76}
 							}))
 					]),
 				_List_fromArray(
@@ -27829,8 +27842,8 @@ var $author$project$Main$view = function (_v0) {
 						_Debug_todo(
 							'Main',
 							{
-								start: {line: 336, column: 95},
-								end: {line: 336, column: 105}
+								start: {line: 337, column: 95},
+								end: {line: 337, column: 105}
 							}))
 					]),
 				$author$project$Main$viewMachine(machine))

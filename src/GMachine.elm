@@ -18,6 +18,10 @@ import Set exposing (Set)
 {-| this module implements the runtime behavior of the G-Machine
 
 Augustsson, Lennart. "A compiler for lazy ML." 1984.
+
+A great short tutorial on G-Machine implementation: https://amelia.how/posts/the-gmachine-in-detail.html
+
+A longer tutorial: Peyton Jones, S. L. (1987). The implementation of Functional Programming Languages. Prentice-Hall.
 -}
 
 type alias NodeId = Int
@@ -51,6 +55,7 @@ type RuntimeError
   | EmptyStack
   | OutOfBoundsStack
   | EmptyDump
+  | MissingArgument
   | UnexpectedHole
 
 {-| push a node reference to the stack
@@ -102,6 +107,7 @@ peekNodeOnStack : GMachine -> Result RuntimeError GNode
 peekNodeOnStack gmachine = Result.fromMaybe EmptyStack (List.head gmachine.stack)
   |> Result.andThen (retrieveNode gmachine)
 
+{-| retrieve the data given by an address -}
 retrieveNode : GMachine -> NodeId -> Result RuntimeError GNode
 retrieveNode gmachine node = Result.fromMaybe (NodeDoesNotExist node) (Dict.get node gmachine.graph)
 
@@ -116,18 +122,6 @@ getArg : GNode -> Maybe NodeId
 getArg node = case node of
   GApp _ arg -> Just arg
   _ -> Nothing
-
-{-| retrieve pointers directly to the arguments referenced by the application nodes on the stack
--}
-getArgsOnSpine : Int -> GMachine -> Maybe (List NodeId)
-getArgsOnSpine numArgs gmachine =
-  let argsOnSpine = gmachine.stack
-        |> List.drop 1
-        |> List.take numArgs
-        |> List.filterMap (flip Dict.get gmachine.graph)
-        |> List.filterMap getArg
-  in if List.length argsOnSpine == numArgs
-  then Just argsOnSpine else Nothing
 
 {-| given the next GCode instruction, perform the state transition for the G-Machine
 
@@ -170,30 +164,27 @@ stateTransition instruction ({stack, code, dump, env} as gmachine) =
       |> setCode [UNWIND]
       |> Ok
 
-    (UNWIND, Ok (GFunc global)) -> case getArgsOnSpine global.numFormals gmachine of
+    (UNWIND, Ok (GFunc global)) ->
+      let enoughArguments = List.length stack + 1 >= global.numFormals
+      in
+      if enoughArguments
       -- given that enough arguments are present on the stack,
-      -- rearrange the stack pointers to directly point towards the argument nodes
-      -- and jump to the global function's code for evaluation
-      Just args -> gmachine
-        |> setStack (args ++ List.drop global.numFormals stack)
-        |> setCode global.code
-        -- |> garbageCollection
-        |> Ok
+      -- jump to the global function's code for evaluation
+      then Ok (setCode global.code gmachine)
 
       -- not enough arguments are on the stack,
       -- so we restore the saved context with the root of the current redex
       -- on the top of the stack
-      Nothing -> case (List.reverse stack, dump) of
+      else case (List.reverse stack, dump) of
         (redexRoot :: _, (oldStack, oldCode) :: dump_) -> gmachine
           |> setStack (redexRoot :: oldStack)
           |> setCode oldCode
           |> setDump dump_
-          -- |> garbageCollection -- TODO move garbage collection to when you first see UNWIND
           |> Ok
             
         ([], _) -> Err EmptyStack
 
-        (_, []) -> Err EmptyDump
+        (_, []) -> Err EmptyDump -- TODO this means WHNF reached
 
     (UNWIND, Ok GHole) -> Err UnexpectedHole
 
@@ -210,9 +201,22 @@ stateTransition instruction ({stack, code, dump, env} as gmachine) =
 
     (POP k, _) -> Ok <| pop k gmachine 
 
-    (PUSH k, _) -> case List.Extra.getAt k stack of
+    -- push a local value that is referenced at offset k in the stack
+    (PUSHLOCAL k, _) -> case List.Extra.getAt k stack of
       Just node -> Ok <| push node gmachine
       Nothing -> Err EmptyStack
+    
+    -- push a function argument onto the top of the stack
+    -- by following the right child pointer of the application node at offset k
+    (PUSHARG k, _) ->
+      let arg = List.Extra.getAt (k + 1) stack
+            |> Result.fromMaybe EmptyStack
+            |> Result.andThen (retrieveNode gmachine)
+            |> Result.map getArg
+      in case arg of
+        Ok (Just argAddr) -> Ok <| push argAddr gmachine
+        Ok Nothing -> Err MissingArgument
+        Err err -> Err err  
 
     -- push an application node combining the two elements on the top of the stack
     (MKAP, _) -> case stack of
@@ -280,7 +284,9 @@ reachableNodes root graph visited =
       (reachableNodes leftChild graph newVisitedSet)
     Nothing -> newVisitedSet
 
-{-| simple mark-scan -}
+{-| simple mark-scan, traverse the heap graph to find reachable cells
+starting with the stack pointers (as well as in the dump) 
+-}
 garbageCollection : GMachine -> GMachine
 garbageCollection ({stack, dump, graph} as gmachine) =
   let stackPointers = List.concat (stack :: List.map Tuple.first dump)
@@ -299,6 +305,7 @@ type RuntimeResult
   = Running GMachine
   | Terminated NodeId GGraph
   | Crash RuntimeError
+
 
 
 {-| perform the next state transition of the g-machine

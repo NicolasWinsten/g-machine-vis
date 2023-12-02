@@ -315,7 +315,8 @@ gCodeToString instruction = case instruction of
   Backend.UNWIND          -> "UNWIND"
   Backend.UPDATE i        -> "UPDATE " ++ String.fromInt i
   Backend.POP n           -> "POP " ++ String.fromInt n
-  Backend.PUSH i          -> "PUSH " ++ String.fromInt i
+  Backend.PUSHLOCAL i     -> "PUSHLOCAL " ++ String.fromInt i
+  Backend.PUSHARG i       -> "PUSHARG " ++ String.fromInt i
   Backend.MKAP            -> "MKAP"
   Backend.SLIDE n         -> "SLIDE " ++ String.fromInt n
 
