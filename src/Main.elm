@@ -138,18 +138,14 @@ sourceCodeTextArea src = EI.multiline
   }
   |> E.el [E.scrollbarY, fillHeight, fillWidth]
 
-getChildren : G.GNode -> List G.NodeId
-getChildren node = case node of
-  G.GApp left right -> [left, right]
-  _ -> []
-
 getNodes : G.GGraph -> List (Graph.Node G.GNode)
 getNodes = Dict.toList >> List.map (\(id, node) -> {id=id, label=node})
 
 getEdges : G.GGraph -> List (Graph.Edge ())
 getEdges graph = Dict.toList graph
-  |> List.concatMap (\(id, node) ->
-    List.map (\child -> {from=id, to=child, label=()}) (getChildren node)
+  |> List.concatMap (\(id, node) -> case G.getChildren node of
+    Just (left, right) -> [{from=id, to=left, label=()}, {from=id, to=right, label=()}]
+    Nothing -> []
   )
 
 runLayout : G.GGraph -> D.GraphLayout
