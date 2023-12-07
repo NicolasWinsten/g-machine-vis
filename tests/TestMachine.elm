@@ -106,3 +106,12 @@ main = double (min 10 3)
     """
     (TInt 14)
 
+simpleMath2 : Test
+simpleMath2 = testRun
+    """
+double x = x + x
+negate x = 0 - x
+main = 1 - 2 - 3 == double (negate 2)
+    """
+    (TInt 1)
+

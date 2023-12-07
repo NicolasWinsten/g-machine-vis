@@ -7,7 +7,9 @@ import Parser exposing (DeadEnd)
 import Basics.Extra exposing (flip)
 import Result.Extra
 import String.Extra
-import Parser exposing (getChompedString, oneOf)
+import Parser exposing (oneOf)
+import Parser.Expression as PE
+
 
 {-
 this module parses source code to ASTs
@@ -103,32 +105,24 @@ app : Parser SCExpr
 app = some (term |. spaces)
   |> Parser.map (\(t1, rest) -> List.foldl (flip SCApp) t1 rest)
 
-{-| parse multiplication or division expression
--}
-arith1 : Parser SCExpr
-arith1 =
-  let operation = succeed (\left op right -> SCApp (SCApp (SCIdent op) left) right)
-        |= app
-        |. spaces
-        |= getChompedString (oneOf [symbol "*", symbol "/"])
-        |. spaces
-        |= app
-  in oneOf [Parser.backtrackable operation, app]
 
-{-| parse addition or subtraction expression
--}
-arith : Parser SCExpr
-arith =
-  let operation = succeed (\left op right -> SCApp (SCApp (SCIdent op) left) right)
-        |= arith1
-        |. spaces
-        |= getChompedString (oneOf [symbol "+", symbol "-"])
-        |. spaces
-        |= arith1
-  in oneOf [Parser.backtrackable operation, arith1]
+operator : Name -> PE.Operator SCExpr
+operator op = PE.infixOperator
+  (\left right -> SCApp (SCApp (SCIdent op) left) right)
+  (symbol op)
+  PE.AssocLeft
+
+operators : PE.OperatorTable SCExpr
+operators = List.map (List.map operator)
+  [ ["*", "/"]
+  , ["+", "-"]
+  , ["=="]
+  ]
+
+arith = PE.buildExpressionParser operators (lazy <| \_ -> app)
 
 expr : Parser SCExpr
-expr = arith
+expr = oneOf [Parser.backtrackable arith, app]
 
 type alias ParseFailure = List DeadEnd
 

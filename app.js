@@ -11100,9 +11100,6 @@ var $author$project$Frontend$SCApp = F2(
 	function (a, b) {
 		return {$: 'SCApp', a: a, b: b};
 	});
-var $author$project$Frontend$SCIdent = function (a) {
-	return {$: 'SCIdent', a: a};
-};
 var $elm$parser$Parser$Advanced$backtrackable = function (_v0) {
 	var parse = _v0.a;
 	return $elm$parser$Parser$Advanced$Parser(
@@ -11119,39 +11116,38 @@ var $elm$parser$Parser$Advanced$backtrackable = function (_v0) {
 		});
 };
 var $elm$parser$Parser$backtrackable = $elm$parser$Parser$Advanced$backtrackable;
-var $elm_community$basics_extra$Basics$Extra$flip = F3(
-	function (f, b, a) {
-		return A2(f, a, b);
-	});
-var $elm$parser$Parser$Advanced$mapChompedString = F2(
-	function (func, _v0) {
-		var parse = _v0.a;
+var $elm$parser$Parser$Advanced$andThen = F2(
+	function (callback, _v0) {
+		var parseA = _v0.a;
 		return $elm$parser$Parser$Advanced$Parser(
 			function (s0) {
-				var _v1 = parse(s0);
+				var _v1 = parseA(s0);
 				if (_v1.$ === 'Bad') {
 					var p = _v1.a;
 					var x = _v1.b;
 					return A2($elm$parser$Parser$Advanced$Bad, p, x);
 				} else {
-					var p = _v1.a;
+					var p1 = _v1.a;
 					var a = _v1.b;
 					var s1 = _v1.c;
-					return A3(
-						$elm$parser$Parser$Advanced$Good,
-						p,
-						A2(
-							func,
-							A3($elm$core$String$slice, s0.offset, s1.offset, s0.src),
-							a),
-						s1);
+					var _v2 = callback(a);
+					var parseB = _v2.a;
+					var _v3 = parseB(s1);
+					if (_v3.$ === 'Bad') {
+						var p2 = _v3.a;
+						var x = _v3.b;
+						return A2($elm$parser$Parser$Advanced$Bad, p1 || p2, x);
+					} else {
+						var p2 = _v3.a;
+						var b = _v3.b;
+						var s2 = _v3.c;
+						return A3($elm$parser$Parser$Advanced$Good, p1 || p2, b, s2);
+					}
 				}
 			});
 	});
-var $elm$parser$Parser$Advanced$getChompedString = function (parser) {
-	return A2($elm$parser$Parser$Advanced$mapChompedString, $elm$core$Basics$always, parser);
-};
-var $elm$parser$Parser$getChompedString = $elm$parser$Parser$Advanced$getChompedString;
+var $elm$parser$Parser$andThen = $elm$parser$Parser$Advanced$andThen;
+var $Punie$elm_parser_extras$Parser$Expression$initOps = {lassoc: _List_Nil, nassoc: _List_Nil, postfix: _List_Nil, prefix: _List_Nil, rassoc: _List_Nil};
 var $elm$parser$Parser$Advanced$map2 = F3(
 	function (func, _v0, _v1) {
 		var parseA = _v0.a;
@@ -11184,6 +11180,289 @@ var $elm$parser$Parser$Advanced$map2 = F3(
 					}
 				}
 			});
+	});
+var $elm$parser$Parser$Advanced$keeper = F2(
+	function (parseFunc, parseArg) {
+		return A3($elm$parser$Parser$Advanced$map2, $elm$core$Basics$apL, parseFunc, parseArg);
+	});
+var $elm$parser$Parser$keeper = $elm$parser$Parser$Advanced$keeper;
+var $elm$parser$Parser$Advanced$Append = F2(
+	function (a, b) {
+		return {$: 'Append', a: a, b: b};
+	});
+var $elm$parser$Parser$Advanced$oneOfHelp = F3(
+	function (s0, bag, parsers) {
+		oneOfHelp:
+		while (true) {
+			if (!parsers.b) {
+				return A2($elm$parser$Parser$Advanced$Bad, false, bag);
+			} else {
+				var parse = parsers.a.a;
+				var remainingParsers = parsers.b;
+				var _v1 = parse(s0);
+				if (_v1.$ === 'Good') {
+					var step = _v1;
+					return step;
+				} else {
+					var step = _v1;
+					var p = step.a;
+					var x = step.b;
+					if (p) {
+						return step;
+					} else {
+						var $temp$s0 = s0,
+							$temp$bag = A2($elm$parser$Parser$Advanced$Append, bag, x),
+							$temp$parsers = remainingParsers;
+						s0 = $temp$s0;
+						bag = $temp$bag;
+						parsers = $temp$parsers;
+						continue oneOfHelp;
+					}
+				}
+			}
+		}
+	});
+var $elm$parser$Parser$Advanced$oneOf = function (parsers) {
+	return $elm$parser$Parser$Advanced$Parser(
+		function (s) {
+			return A3($elm$parser$Parser$Advanced$oneOfHelp, s, $elm$parser$Parser$Advanced$Empty, parsers);
+		});
+};
+var $elm$parser$Parser$oneOf = $elm$parser$Parser$Advanced$oneOf;
+var $elm$core$Tuple$pair = F2(
+	function (a, b) {
+		return _Utils_Tuple2(a, b);
+	});
+var $elm$parser$Parser$Problem = function (a) {
+	return {$: 'Problem', a: a};
+};
+var $elm$parser$Parser$Advanced$problem = function (x) {
+	return $elm$parser$Parser$Advanced$Parser(
+		function (s) {
+			return A2(
+				$elm$parser$Parser$Advanced$Bad,
+				false,
+				A2($elm$parser$Parser$Advanced$fromState, s, x));
+		});
+};
+var $elm$parser$Parser$problem = function (msg) {
+	return $elm$parser$Parser$Advanced$problem(
+		$elm$parser$Parser$Problem(msg));
+};
+var $Punie$elm_parser_extras$Parser$Expression$splitOp = F2(
+	function (operator, ops) {
+		var rassoc = ops.rassoc;
+		var lassoc = ops.lassoc;
+		var nassoc = ops.nassoc;
+		var prefix = ops.prefix;
+		var postfix = ops.postfix;
+		switch (operator.$) {
+			case 'Infix':
+				switch (operator.b.$) {
+					case 'AssocNone':
+						var op = operator.a;
+						var _v1 = operator.b;
+						return _Utils_update(
+							ops,
+							{
+								nassoc: A2($elm$core$List$cons, op, ops.nassoc)
+							});
+					case 'AssocLeft':
+						var op = operator.a;
+						var _v2 = operator.b;
+						return _Utils_update(
+							ops,
+							{
+								lassoc: A2($elm$core$List$cons, op, ops.lassoc)
+							});
+					default:
+						var op = operator.a;
+						var _v3 = operator.b;
+						return _Utils_update(
+							ops,
+							{
+								rassoc: A2($elm$core$List$cons, op, ops.rassoc)
+							});
+				}
+			case 'Prefix':
+				var op = operator.a;
+				return _Utils_update(
+					ops,
+					{
+						prefix: A2($elm$core$List$cons, op, ops.prefix)
+					});
+			default:
+				var op = operator.a;
+				return _Utils_update(
+					ops,
+					{
+						postfix: A2($elm$core$List$cons, op, ops.postfix)
+					});
+		}
+	});
+var $elm$parser$Parser$Advanced$succeed = function (a) {
+	return $elm$parser$Parser$Advanced$Parser(
+		function (s) {
+			return A3($elm$parser$Parser$Advanced$Good, false, a, s);
+		});
+};
+var $elm$parser$Parser$succeed = $elm$parser$Parser$Advanced$succeed;
+var $Punie$elm_parser_extras$Parser$Expression$makeParser = F2(
+	function (ops, term) {
+		var ambiguous = F2(
+			function (assoc, op) {
+				return $elm$parser$Parser$backtrackable(
+					A2(
+						$elm$parser$Parser$andThen,
+						function (_v3) {
+							return $elm$parser$Parser$problem('ambiguous use of a ' + (assoc + ' associative operator'));
+						},
+						op));
+			});
+		var _v0 = A3($elm$core$List$foldr, $Punie$elm_parser_extras$Parser$Expression$splitOp, $Punie$elm_parser_extras$Parser$Expression$initOps, ops);
+		var rassoc = _v0.rassoc;
+		var lassoc = _v0.lassoc;
+		var nassoc = _v0.nassoc;
+		var prefix = _v0.prefix;
+		var postfix = _v0.postfix;
+		var lassocOp = $elm$parser$Parser$oneOf(lassoc);
+		var ambiguousLeft = A2(ambiguous, 'left', lassocOp);
+		var nassocOp = $elm$parser$Parser$oneOf(nassoc);
+		var ambiguousNon = A2(ambiguous, 'non', nassocOp);
+		var postfixOp = $elm$parser$Parser$oneOf(postfix);
+		var postfixP = $elm$parser$Parser$oneOf(
+			_List_fromArray(
+				[
+					postfixOp,
+					$elm$parser$Parser$succeed($elm$core$Basics$identity)
+				]));
+		var prefixOp = $elm$parser$Parser$oneOf(prefix);
+		var prefixP = $elm$parser$Parser$oneOf(
+			_List_fromArray(
+				[
+					prefixOp,
+					$elm$parser$Parser$succeed($elm$core$Basics$identity)
+				]));
+		var termP = A2(
+			$elm$parser$Parser$keeper,
+			A2(
+				$elm$parser$Parser$keeper,
+				A2(
+					$elm$parser$Parser$keeper,
+					$elm$parser$Parser$succeed(
+						F3(
+							function (pre, x, post) {
+								return post(
+									pre(x));
+							})),
+					prefixP),
+				term),
+			postfixP);
+		var rassocOp = $elm$parser$Parser$oneOf(rassoc);
+		var ambiguousRight = A2(ambiguous, 'right', rassocOp);
+		var lassocP = function (x) {
+			return $elm$parser$Parser$oneOf(
+				_List_fromArray(
+					[
+						A2(
+						$elm$parser$Parser$andThen,
+						function (_v2) {
+							var f = _v2.a;
+							var y = _v2.b;
+							return lassocP1(
+								A2(f, x, y));
+						},
+						A2(
+							$elm$parser$Parser$keeper,
+							A2(
+								$elm$parser$Parser$keeper,
+								$elm$parser$Parser$succeed($elm$core$Tuple$pair),
+								lassocOp),
+							termP)),
+						ambiguousRight,
+						ambiguousNon
+					]));
+		};
+		var lassocP1 = function (x) {
+			return $elm$parser$Parser$oneOf(
+				_List_fromArray(
+					[
+						lassocP(x),
+						$elm$parser$Parser$succeed(x)
+					]));
+		};
+		var nassocP = function (x) {
+			return A2(
+				$elm$parser$Parser$andThen,
+				function (_v1) {
+					var f = _v1.a;
+					var y = _v1.b;
+					return $elm$parser$Parser$oneOf(
+						_List_fromArray(
+							[
+								ambiguousRight,
+								ambiguousLeft,
+								ambiguousNon,
+								$elm$parser$Parser$succeed(
+								A2(f, x, y))
+							]));
+				},
+				A2(
+					$elm$parser$Parser$keeper,
+					A2(
+						$elm$parser$Parser$keeper,
+						$elm$parser$Parser$succeed($elm$core$Tuple$pair),
+						nassocOp),
+					termP));
+		};
+		var rassocP = function (x) {
+			return $elm$parser$Parser$oneOf(
+				_List_fromArray(
+					[
+						A2(
+						$elm$parser$Parser$keeper,
+						A2(
+							$elm$parser$Parser$keeper,
+							$elm$parser$Parser$succeed(
+								F2(
+									function (f, y) {
+										return A2(f, x, y);
+									})),
+							rassocOp),
+						A2($elm$parser$Parser$andThen, rassocP1, termP)),
+						ambiguousLeft,
+						ambiguousNon
+					]));
+		};
+		var rassocP1 = function (x) {
+			return $elm$parser$Parser$oneOf(
+				_List_fromArray(
+					[
+						rassocP(x),
+						$elm$parser$Parser$succeed(x)
+					]));
+		};
+		return A2(
+			$elm$parser$Parser$andThen,
+			function (x) {
+				return $elm$parser$Parser$oneOf(
+					_List_fromArray(
+						[
+							rassocP(x),
+							lassocP(x),
+							nassocP(x),
+							$elm$parser$Parser$succeed(x)
+						]));
+			},
+			termP);
+	});
+var $Punie$elm_parser_extras$Parser$Expression$buildExpressionParser = F2(
+	function (operators, simpleExpr) {
+		return A3($elm$core$List$foldl, $Punie$elm_parser_extras$Parser$Expression$makeParser, simpleExpr, operators);
+	});
+var $elm_community$basics_extra$Basics$Extra$flip = F3(
+	function (f, b, a) {
+		return A2(f, a, b);
 	});
 var $elm$parser$Parser$Advanced$ignorer = F2(
 	function (keepParser, ignoreParser) {
@@ -11375,11 +11654,6 @@ var $author$project$Frontend$intLit = $elm$parser$Parser$number(
 		_int: $elm$core$Maybe$Just($author$project$Frontend$SCInt),
 		octal: $elm$core$Maybe$Nothing
 	});
-var $elm$parser$Parser$Advanced$keeper = F2(
-	function (parseFunc, parseArg) {
-		return A3($elm$parser$Parser$Advanced$map2, $elm$core$Basics$apL, parseFunc, parseArg);
-	});
-var $elm$parser$Parser$keeper = $elm$parser$Parser$Advanced$keeper;
 var $elm$parser$Parser$Advanced$lazy = function (thunk) {
 	return $elm$parser$Parser$Advanced$Parser(
 		function (s) {
@@ -11412,55 +11686,158 @@ var $elm$parser$Parser$Advanced$map = F2(
 			});
 	});
 var $elm$parser$Parser$map = $elm$parser$Parser$Advanced$map;
-var $elm$parser$Parser$Advanced$Append = F2(
+var $Punie$elm_parser_extras$Parser$Expression$AssocLeft = {$: 'AssocLeft'};
+var $author$project$Frontend$SCIdent = function (a) {
+	return {$: 'SCIdent', a: a};
+};
+var $Punie$elm_parser_extras$Parser$Expression$Infix = F2(
 	function (a, b) {
-		return {$: 'Append', a: a, b: b};
+		return {$: 'Infix', a: a, b: b};
 	});
-var $elm$parser$Parser$Advanced$oneOfHelp = F3(
-	function (s0, bag, parsers) {
-		oneOfHelp:
+var $elm$parser$Parser$Advanced$isSubChar = _Parser_isSubChar;
+var $elm$parser$Parser$Advanced$chompWhileHelp = F5(
+	function (isGood, offset, row, col, s0) {
+		chompWhileHelp:
 		while (true) {
-			if (!parsers.b) {
-				return A2($elm$parser$Parser$Advanced$Bad, false, bag);
+			var newOffset = A3($elm$parser$Parser$Advanced$isSubChar, isGood, offset, s0.src);
+			if (_Utils_eq(newOffset, -1)) {
+				return A3(
+					$elm$parser$Parser$Advanced$Good,
+					_Utils_cmp(s0.offset, offset) < 0,
+					_Utils_Tuple0,
+					{col: col, context: s0.context, indent: s0.indent, offset: offset, row: row, src: s0.src});
 			} else {
-				var parse = parsers.a.a;
-				var remainingParsers = parsers.b;
-				var _v1 = parse(s0);
-				if (_v1.$ === 'Good') {
-					var step = _v1;
-					return step;
+				if (_Utils_eq(newOffset, -2)) {
+					var $temp$isGood = isGood,
+						$temp$offset = offset + 1,
+						$temp$row = row + 1,
+						$temp$col = 1,
+						$temp$s0 = s0;
+					isGood = $temp$isGood;
+					offset = $temp$offset;
+					row = $temp$row;
+					col = $temp$col;
+					s0 = $temp$s0;
+					continue chompWhileHelp;
 				} else {
-					var step = _v1;
-					var p = step.a;
-					var x = step.b;
-					if (p) {
-						return step;
-					} else {
-						var $temp$s0 = s0,
-							$temp$bag = A2($elm$parser$Parser$Advanced$Append, bag, x),
-							$temp$parsers = remainingParsers;
-						s0 = $temp$s0;
-						bag = $temp$bag;
-						parsers = $temp$parsers;
-						continue oneOfHelp;
-					}
+					var $temp$isGood = isGood,
+						$temp$offset = newOffset,
+						$temp$row = row,
+						$temp$col = col + 1,
+						$temp$s0 = s0;
+					isGood = $temp$isGood;
+					offset = $temp$offset;
+					row = $temp$row;
+					col = $temp$col;
+					s0 = $temp$s0;
+					continue chompWhileHelp;
 				}
 			}
 		}
 	});
-var $elm$parser$Parser$Advanced$oneOf = function (parsers) {
+var $elm$parser$Parser$Advanced$chompWhile = function (isGood) {
 	return $elm$parser$Parser$Advanced$Parser(
 		function (s) {
-			return A3($elm$parser$Parser$Advanced$oneOfHelp, s, $elm$parser$Parser$Advanced$Empty, parsers);
+			return A5($elm$parser$Parser$Advanced$chompWhileHelp, isGood, s.offset, s.row, s.col, s);
 		});
 };
-var $elm$parser$Parser$oneOf = $elm$parser$Parser$Advanced$oneOf;
+var $elm$parser$Parser$Advanced$spaces = $elm$parser$Parser$Advanced$chompWhile(
+	function (c) {
+		return _Utils_eq(
+			c,
+			_Utils_chr(' ')) || (_Utils_eq(
+			c,
+			_Utils_chr('\n')) || _Utils_eq(
+			c,
+			_Utils_chr('\r')));
+	});
+var $elm$parser$Parser$spaces = $elm$parser$Parser$Advanced$spaces;
+var $Punie$elm_parser_extras$Parser$Expression$binaryOp = F2(
+	function (fn, opParser) {
+		return A2(
+			$elm$parser$Parser$ignorer,
+			A2(
+				$elm$parser$Parser$ignorer,
+				$elm$parser$Parser$succeed(fn),
+				opParser),
+			$elm$parser$Parser$spaces);
+	});
+var $Punie$elm_parser_extras$Parser$Expression$infixOperator = F3(
+	function (fn, opParser, assoc) {
+		return A2(
+			$Punie$elm_parser_extras$Parser$Expression$Infix,
+			A2($Punie$elm_parser_extras$Parser$Expression$binaryOp, fn, opParser),
+			assoc);
+	});
+var $elm$parser$Parser$ExpectingSymbol = function (a) {
+	return {$: 'ExpectingSymbol', a: a};
+};
+var $elm$parser$Parser$Advanced$Token = F2(
+	function (a, b) {
+		return {$: 'Token', a: a, b: b};
+	});
+var $elm$parser$Parser$Advanced$isSubString = _Parser_isSubString;
+var $elm$parser$Parser$Advanced$token = function (_v0) {
+	var str = _v0.a;
+	var expecting = _v0.b;
+	var progress = !$elm$core$String$isEmpty(str);
+	return $elm$parser$Parser$Advanced$Parser(
+		function (s) {
+			var _v1 = A5($elm$parser$Parser$Advanced$isSubString, str, s.offset, s.row, s.col, s.src);
+			var newOffset = _v1.a;
+			var newRow = _v1.b;
+			var newCol = _v1.c;
+			return _Utils_eq(newOffset, -1) ? A2(
+				$elm$parser$Parser$Advanced$Bad,
+				false,
+				A2($elm$parser$Parser$Advanced$fromState, s, expecting)) : A3(
+				$elm$parser$Parser$Advanced$Good,
+				progress,
+				_Utils_Tuple0,
+				{col: newCol, context: s.context, indent: s.indent, offset: newOffset, row: newRow, src: s.src});
+		});
+};
+var $elm$parser$Parser$Advanced$symbol = $elm$parser$Parser$Advanced$token;
+var $elm$parser$Parser$symbol = function (str) {
+	return $elm$parser$Parser$Advanced$symbol(
+		A2(
+			$elm$parser$Parser$Advanced$Token,
+			str,
+			$elm$parser$Parser$ExpectingSymbol(str)));
+};
+var $author$project$Frontend$operator = function (op) {
+	return A3(
+		$Punie$elm_parser_extras$Parser$Expression$infixOperator,
+		F2(
+			function (left, right) {
+				return A2(
+					$author$project$Frontend$SCApp,
+					A2(
+						$author$project$Frontend$SCApp,
+						$author$project$Frontend$SCIdent(op),
+						left),
+					right);
+			}),
+		$elm$parser$Parser$symbol(op),
+		$Punie$elm_parser_extras$Parser$Expression$AssocLeft);
+};
+var $author$project$Frontend$operators = A2(
+	$elm$core$List$map,
+	$elm$core$List$map($author$project$Frontend$operator),
+	_List_fromArray(
+		[
+			_List_fromArray(
+			['*', '/']),
+			_List_fromArray(
+			['+', '-']),
+			_List_fromArray(
+			['=='])
+		]));
 var $elm$core$Set$Set_elm_builtin = function (a) {
 	return {$: 'Set_elm_builtin', a: a};
 };
 var $elm$core$Set$empty = $elm$core$Set$Set_elm_builtin($elm$core$Dict$empty);
 var $elm$parser$Parser$ExpectingVariable = {$: 'ExpectingVariable'};
-var $elm$parser$Parser$Advanced$isSubChar = _Parser_isSubChar;
 var $elm$core$Dict$member = F2(
 	function (key, dict) {
 		var _v0 = A2($elm$core$Dict$get, key, dict);
@@ -11626,70 +12003,6 @@ var $elm$parser$Parser$Done = function (a) {
 var $elm$parser$Parser$Loop = function (a) {
 	return {$: 'Loop', a: a};
 };
-var $elm$parser$Parser$Advanced$chompWhileHelp = F5(
-	function (isGood, offset, row, col, s0) {
-		chompWhileHelp:
-		while (true) {
-			var newOffset = A3($elm$parser$Parser$Advanced$isSubChar, isGood, offset, s0.src);
-			if (_Utils_eq(newOffset, -1)) {
-				return A3(
-					$elm$parser$Parser$Advanced$Good,
-					_Utils_cmp(s0.offset, offset) < 0,
-					_Utils_Tuple0,
-					{col: col, context: s0.context, indent: s0.indent, offset: offset, row: row, src: s0.src});
-			} else {
-				if (_Utils_eq(newOffset, -2)) {
-					var $temp$isGood = isGood,
-						$temp$offset = offset + 1,
-						$temp$row = row + 1,
-						$temp$col = 1,
-						$temp$s0 = s0;
-					isGood = $temp$isGood;
-					offset = $temp$offset;
-					row = $temp$row;
-					col = $temp$col;
-					s0 = $temp$s0;
-					continue chompWhileHelp;
-				} else {
-					var $temp$isGood = isGood,
-						$temp$offset = newOffset,
-						$temp$row = row,
-						$temp$col = col + 1,
-						$temp$s0 = s0;
-					isGood = $temp$isGood;
-					offset = $temp$offset;
-					row = $temp$row;
-					col = $temp$col;
-					s0 = $temp$s0;
-					continue chompWhileHelp;
-				}
-			}
-		}
-	});
-var $elm$parser$Parser$Advanced$chompWhile = function (isGood) {
-	return $elm$parser$Parser$Advanced$Parser(
-		function (s) {
-			return A5($elm$parser$Parser$Advanced$chompWhileHelp, isGood, s.offset, s.row, s.col, s);
-		});
-};
-var $elm$parser$Parser$Advanced$spaces = $elm$parser$Parser$Advanced$chompWhile(
-	function (c) {
-		return _Utils_eq(
-			c,
-			_Utils_chr(' ')) || (_Utils_eq(
-			c,
-			_Utils_chr('\n')) || _Utils_eq(
-			c,
-			_Utils_chr('\r')));
-	});
-var $elm$parser$Parser$spaces = $elm$parser$Parser$Advanced$spaces;
-var $elm$parser$Parser$Advanced$succeed = function (a) {
-	return $elm$parser$Parser$Advanced$Parser(
-		function (s) {
-			return A3($elm$parser$Parser$Advanced$Good, false, a, s);
-		});
-};
-var $elm$parser$Parser$succeed = $elm$parser$Parser$Advanced$succeed;
 var $Punie$elm_parser_extras$Parser$Extras$manyHelp = F2(
 	function (p, vs) {
 		return $elm$parser$Parser$oneOf(
@@ -11718,10 +12031,6 @@ var $Punie$elm_parser_extras$Parser$Extras$many = function (p) {
 		_List_Nil,
 		$Punie$elm_parser_extras$Parser$Extras$manyHelp(p));
 };
-var $elm$core$Tuple$pair = F2(
-	function (a, b) {
-		return _Utils_Tuple2(a, b);
-	});
 var $Punie$elm_parser_extras$Parser$Extras$some = function (p) {
 	return A2(
 		$elm$parser$Parser$keeper,
@@ -11731,131 +12040,21 @@ var $Punie$elm_parser_extras$Parser$Extras$some = function (p) {
 			A2($elm$parser$Parser$ignorer, p, $elm$parser$Parser$spaces)),
 		$Punie$elm_parser_extras$Parser$Extras$many(p));
 };
-var $elm$parser$Parser$ExpectingSymbol = function (a) {
-	return {$: 'ExpectingSymbol', a: a};
-};
-var $elm$parser$Parser$Advanced$Token = F2(
-	function (a, b) {
-		return {$: 'Token', a: a, b: b};
-	});
-var $elm$parser$Parser$Advanced$isSubString = _Parser_isSubString;
-var $elm$parser$Parser$Advanced$token = function (_v0) {
-	var str = _v0.a;
-	var expecting = _v0.b;
-	var progress = !$elm$core$String$isEmpty(str);
-	return $elm$parser$Parser$Advanced$Parser(
-		function (s) {
-			var _v1 = A5($elm$parser$Parser$Advanced$isSubString, str, s.offset, s.row, s.col, s.src);
-			var newOffset = _v1.a;
-			var newRow = _v1.b;
-			var newCol = _v1.c;
-			return _Utils_eq(newOffset, -1) ? A2(
-				$elm$parser$Parser$Advanced$Bad,
-				false,
-				A2($elm$parser$Parser$Advanced$fromState, s, expecting)) : A3(
-				$elm$parser$Parser$Advanced$Good,
-				progress,
-				_Utils_Tuple0,
-				{col: newCol, context: s.context, indent: s.indent, offset: newOffset, row: newRow, src: s.src});
-		});
-};
-var $elm$parser$Parser$Advanced$symbol = $elm$parser$Parser$Advanced$token;
-var $elm$parser$Parser$symbol = function (str) {
-	return $elm$parser$Parser$Advanced$symbol(
-		A2(
-			$elm$parser$Parser$Advanced$Token,
-			str,
-			$elm$parser$Parser$ExpectingSymbol(str)));
-};
 function $author$project$Frontend$cyclic$expr() {
-	return $author$project$Frontend$cyclic$arith();
-}
-function $author$project$Frontend$cyclic$arith() {
-	var operation = A2(
-		$elm$parser$Parser$keeper,
-		A2(
-			$elm$parser$Parser$keeper,
-			A2(
-				$elm$parser$Parser$keeper,
-				$elm$parser$Parser$succeed(
-					F3(
-						function (left, op, right) {
-							return A2(
-								$author$project$Frontend$SCApp,
-								A2(
-									$author$project$Frontend$SCApp,
-									$author$project$Frontend$SCIdent(op),
-									left),
-								right);
-						})),
-				A2(
-					$elm$parser$Parser$ignorer,
-					$author$project$Frontend$cyclic$arith1(),
-					$elm$parser$Parser$spaces)),
-			A2(
-				$elm$parser$Parser$ignorer,
-				$elm$parser$Parser$getChompedString(
-					$elm$parser$Parser$oneOf(
-						_List_fromArray(
-							[
-								$elm$parser$Parser$symbol('+'),
-								$elm$parser$Parser$symbol('-')
-							]))),
-				$elm$parser$Parser$spaces)),
-		$author$project$Frontend$cyclic$arith1());
 	return $elm$parser$Parser$oneOf(
 		_List_fromArray(
 			[
-				$elm$parser$Parser$backtrackable(operation),
-				$author$project$Frontend$cyclic$arith1()
-			]));
-}
-function $author$project$Frontend$cyclic$arith1() {
-	var operation = A2(
-		$elm$parser$Parser$keeper,
-		A2(
-			$elm$parser$Parser$keeper,
-			A2(
-				$elm$parser$Parser$keeper,
-				$elm$parser$Parser$succeed(
-					F3(
-						function (left, op, right) {
-							return A2(
-								$author$project$Frontend$SCApp,
-								A2(
-									$author$project$Frontend$SCApp,
-									$author$project$Frontend$SCIdent(op),
-									left),
-								right);
-						})),
-				A2(
-					$elm$parser$Parser$ignorer,
-					$author$project$Frontend$cyclic$app(),
-					$elm$parser$Parser$spaces)),
-			A2(
-				$elm$parser$Parser$ignorer,
-				$elm$parser$Parser$getChompedString(
-					$elm$parser$Parser$oneOf(
-						_List_fromArray(
-							[
-								$elm$parser$Parser$symbol('*'),
-								$elm$parser$Parser$symbol('/')
-							]))),
-				$elm$parser$Parser$spaces)),
-		$author$project$Frontend$cyclic$app());
-	return $elm$parser$Parser$oneOf(
-		_List_fromArray(
-			[
-				$elm$parser$Parser$backtrackable(operation),
+				$elm$parser$Parser$backtrackable(
+				$author$project$Frontend$cyclic$arith()),
 				$author$project$Frontend$cyclic$app()
 			]));
 }
 function $author$project$Frontend$cyclic$app() {
 	return A2(
 		$elm$parser$Parser$map,
-		function (_v1) {
-			var t1 = _v1.a;
-			var rest = _v1.b;
+		function (_v2) {
+			var t1 = _v2.a;
+			var rest = _v2.b;
 			return A3(
 				$elm$core$List$foldl,
 				$elm_community$basics_extra$Basics$Extra$flip($author$project$Frontend$SCApp),
@@ -11867,6 +12066,15 @@ function $author$project$Frontend$cyclic$app() {
 				$elm$parser$Parser$ignorer,
 				$author$project$Frontend$cyclic$term(),
 				$elm$parser$Parser$spaces)));
+}
+function $author$project$Frontend$cyclic$arith() {
+	return A2(
+		$Punie$elm_parser_extras$Parser$Expression$buildExpressionParser,
+		$author$project$Frontend$operators,
+		$elm$parser$Parser$lazy(
+			function (_v1) {
+				return $author$project$Frontend$cyclic$app();
+			}));
 }
 function $author$project$Frontend$cyclic$term() {
 	return $elm$parser$Parser$oneOf(
@@ -11903,17 +12111,13 @@ try {
 	$author$project$Frontend$cyclic$expr = function () {
 		return $author$project$Frontend$expr;
 	};
-	var $author$project$Frontend$arith = $author$project$Frontend$cyclic$arith();
-	$author$project$Frontend$cyclic$arith = function () {
-		return $author$project$Frontend$arith;
-	};
-	var $author$project$Frontend$arith1 = $author$project$Frontend$cyclic$arith1();
-	$author$project$Frontend$cyclic$arith1 = function () {
-		return $author$project$Frontend$arith1;
-	};
 	var $author$project$Frontend$app = $author$project$Frontend$cyclic$app();
 	$author$project$Frontend$cyclic$app = function () {
 		return $author$project$Frontend$app;
+	};
+	var $author$project$Frontend$arith = $author$project$Frontend$cyclic$arith();
+	$author$project$Frontend$cyclic$arith = function () {
+		return $author$project$Frontend$arith;
 	};
 	var $author$project$Frontend$term = $author$project$Frontend$cyclic$term();
 	$author$project$Frontend$cyclic$term = function () {
@@ -11924,38 +12128,8 @@ try {
 		return $author$project$Frontend$group;
 	};
 } catch ($) {
-	throw 'Some top-level definitions from `Frontend` are causing infinite recursion:\n\n  ┌─────┐\n  │    expr\n  │     ↓\n  │    arith\n  │     ↓\n  │    arith1\n  │     ↓\n  │    app\n  │     ↓\n  │    term\n  │     ↓\n  │    group\n  └─────┘\n\nThese errors are very tricky, so read https://elm-lang.org/0.19.1/bad-recursion to learn how to fix it!';}
+	throw 'Some top-level definitions from `Frontend` are causing infinite recursion:\n\n  ┌─────┐\n  │    expr\n  │     ↓\n  │    app\n  │     ↓\n  │    arith\n  │     ↓\n  │    term\n  │     ↓\n  │    group\n  └─────┘\n\nThese errors are very tricky, so read https://elm-lang.org/0.19.1/bad-recursion to learn how to fix it!';}
 var $elm$parser$Parser$Mandatory = {$: 'Mandatory'};
-var $elm$parser$Parser$Advanced$andThen = F2(
-	function (callback, _v0) {
-		var parseA = _v0.a;
-		return $elm$parser$Parser$Advanced$Parser(
-			function (s0) {
-				var _v1 = parseA(s0);
-				if (_v1.$ === 'Bad') {
-					var p = _v1.a;
-					var x = _v1.b;
-					return A2($elm$parser$Parser$Advanced$Bad, p, x);
-				} else {
-					var p1 = _v1.a;
-					var a = _v1.b;
-					var s1 = _v1.c;
-					var _v2 = callback(a);
-					var parseB = _v2.a;
-					var _v3 = parseB(s1);
-					if (_v3.$ === 'Bad') {
-						var p2 = _v3.a;
-						var x = _v3.b;
-						return A2($elm$parser$Parser$Advanced$Bad, p1 || p2, x);
-					} else {
-						var p2 = _v3.a;
-						var b = _v3.b;
-						var s2 = _v3.c;
-						return A3($elm$parser$Parser$Advanced$Good, p1 || p2, b, s2);
-					}
-				}
-			});
-	});
 var $elm$parser$Parser$Advanced$revAlways = F2(
 	function (_v0, b) {
 		return b;
