@@ -54,13 +54,10 @@ type Msg
 
 initialProgram =
   """
-I x = x
+min x y = x - y
+double x = x + x
 
-K x y = x
-
-S x y z = (x z) (y z)
-
-main = S I I K
+main = double (min 10 3)
 """
 
 compileSourceCode : Model -> Model
@@ -160,7 +157,8 @@ nodeLabel : Graph.Node G.GNode -> String
 nodeLabel node = case node.label of
   G.GFunc {name} -> name
   G.GApp _ _ -> "@"
-  G.GHole -> ""
+  G.GHole -> "■"
+  G.GInt x -> String.fromInt x
 
 
 nodeShape : Graph.Node G.GNode -> RSDT.Shape
@@ -306,23 +304,10 @@ viewMachine machine = case machine of
   StaticView (G.Crash err) -> E.text "runtime error"
   FailedToCompile err -> E.text "failed to compile"
   Uninitialized -> E.text "Write your program and click compile!"
-
-gCodeToString : Backend.GCode -> String
-gCodeToString instruction = case instruction of
-  Backend.ALLOC n         -> "ALLOC " ++ String.fromInt n
-  Backend.PUSHGLOBAL name -> "PUSHGLOBAL " ++ name
-  Backend.EVAL            -> "EVAL"
-  Backend.UNWIND          -> "UNWIND"
-  Backend.UPDATE i        -> "UPDATE " ++ String.fromInt i
-  Backend.POP n           -> "POP " ++ String.fromInt n
-  Backend.PUSHLOCAL i     -> "PUSHLOCAL " ++ String.fromInt i
-  Backend.PUSHARG i       -> "PUSHARG " ++ String.fromInt i
-  Backend.MKAP            -> "MKAP"
-  Backend.SLIDE n         -> "SLIDE " ++ String.fromInt n
-
+  
 viewCode : List Backend.GCode -> E.Element msg
 viewCode code = E.column [fillHeight, fillWidth]
-  (List.map (gCodeToString >> E.text) code) 
+  (List.map (Backend.gCodeToString >> E.text) code) 
 
 view : Model -> E.Element Msg
 view {sourceCode, machine, viewport} =

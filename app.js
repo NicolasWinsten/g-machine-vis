@@ -10834,8 +10834,8 @@ var $author$project$Backend$PUSHARG = function (a) {
 var $author$project$Backend$PUSHGLOBAL = function (a) {
 	return {$: 'PUSHGLOBAL', a: a};
 };
-var $author$project$Backend$PUSHLOCAL = function (a) {
-	return {$: 'PUSHLOCAL', a: a};
+var $author$project$Backend$PUSHINT = function (a) {
+	return {$: 'PUSHINT', a: a};
 };
 var $author$project$Backend$SLIDE = function (a) {
 	return {$: 'SLIDE', a: a};
@@ -10865,21 +10865,17 @@ var $author$project$Backend$getStackPos = F2(
 	function (name, mapping) {
 		return A2($elm$core$Dict$get, name, mapping);
 	});
-var $author$project$Backend$compileInstantiation = F3(
-	function (e, mapping, context) {
+var $author$project$Backend$compileInstantiation = F4(
+	function (e, numFormals, mapping, context) {
 		switch (e.$) {
 			case 'SCIdent':
 				var name = e.a;
 				var _v2 = A2($author$project$Backend$getStackPos, name, mapping);
 				if (_v2.$ === 'Just') {
 					var offset = _v2.a;
-					var numArgs = $elm$core$Dict$size(mapping);
-					return (_Utils_cmp(offset, numArgs) < 1) ? _List_fromArray(
+					return _List_fromArray(
 						[
-							$author$project$Backend$PUSHARG(context - offset)
-						]) : _List_fromArray(
-						[
-							$author$project$Backend$PUSHLOCAL(context - offset)
+							$author$project$Backend$PUSHARG((context - offset) + 1)
 						]);
 				} else {
 					return _List_fromArray(
@@ -10887,13 +10883,19 @@ var $author$project$Backend$compileInstantiation = F3(
 							$author$project$Backend$PUSHGLOBAL(name)
 						]);
 				}
+			case 'SCInt':
+				var x = e.a;
+				return _List_fromArray(
+					[
+						$author$project$Backend$PUSHINT(x)
+					]);
 			case 'SCApp':
 				var e1 = e.a;
 				var e2 = e.b;
 				return _Utils_ap(
-					A3($author$project$Backend$compileInstantiation, e2, mapping, context),
+					A4($author$project$Backend$compileInstantiation, e2, numFormals, mapping, context),
 					_Utils_ap(
-						A3($author$project$Backend$compileInstantiation, e1, mapping, context + 1),
+						A4($author$project$Backend$compileInstantiation, e1, numFormals, mapping, context + 1),
 						_List_fromArray(
 							[$author$project$Backend$MKAP])));
 			case 'SCLet':
@@ -10902,11 +10904,12 @@ var $author$project$Backend$compileInstantiation = F3(
 				var def_ = _v3.b;
 				var body = e.b;
 				return _Utils_ap(
-					A3($author$project$Backend$compileInstantiation, def_, mapping, context),
+					A4($author$project$Backend$compileInstantiation, def_, numFormals, mapping, context),
 					_Utils_ap(
-						A3(
+						A4(
 							$author$project$Backend$compileInstantiation,
 							body,
+							numFormals,
 							A3($elm$core$Dict$insert, name, context + 1, mapping),
 							context + 1),
 						_List_fromArray(
@@ -10919,17 +10922,17 @@ var $author$project$Backend$compileInstantiation = F3(
 				var mapping_ = A3($author$project$Backend$augmentMapping, bindings, mapping, context);
 				var context_ = context + $elm$core$List$length(bindings);
 				return _Utils_ap(
-					A3($author$project$Backend$compileLetRecBindings, bindings, mapping_, context_),
+					A4($author$project$Backend$compileLetRecBindings, bindings, numFormals, mapping_, context_),
 					_Utils_ap(
-						A3($author$project$Backend$compileInstantiation, body, mapping_, context_),
+						A4($author$project$Backend$compileInstantiation, body, numFormals, mapping_, context_),
 						_List_fromArray(
 							[
 								$author$project$Backend$SLIDE(context_ - context)
 							])));
 		}
 	});
-var $author$project$Backend$compileLetRecBindings = F3(
-	function (bindings, mapping, context) {
+var $author$project$Backend$compileLetRecBindings = F4(
+	function (bindings, numFormals, mapping, context) {
 		var numBindings = $elm$core$List$length(bindings);
 		return $elm$core$List$concat(
 			A2(
@@ -10945,7 +10948,7 @@ var $author$project$Backend$compileLetRecBindings = F3(
 							var name = _v0.a;
 							var e = _v0.b;
 							return _Utils_ap(
-								A3($author$project$Backend$compileInstantiation, e, mapping, context),
+								A4($author$project$Backend$compileInstantiation, e, numFormals, mapping, context),
 								_List_fromArray(
 									[
 										$author$project$Backend$UPDATE(numBindings - i)
@@ -10956,7 +10959,7 @@ var $author$project$Backend$compileLetRecBindings = F3(
 var $author$project$Backend$compileBody = F3(
 	function (body, stackPos, context) {
 		return _Utils_ap(
-			A3($author$project$Backend$compileInstantiation, body, stackPos, context),
+			A4($author$project$Backend$compileInstantiation, body, context, stackPos, context),
 			_Utils_ap(
 				_List_fromArray(
 					[
@@ -11097,10 +11100,58 @@ var $author$project$Frontend$SCApp = F2(
 	function (a, b) {
 		return {$: 'SCApp', a: a, b: b};
 	});
+var $author$project$Frontend$SCIdent = function (a) {
+	return {$: 'SCIdent', a: a};
+};
+var $elm$parser$Parser$Advanced$backtrackable = function (_v0) {
+	var parse = _v0.a;
+	return $elm$parser$Parser$Advanced$Parser(
+		function (s0) {
+			var _v1 = parse(s0);
+			if (_v1.$ === 'Bad') {
+				var x = _v1.b;
+				return A2($elm$parser$Parser$Advanced$Bad, false, x);
+			} else {
+				var a = _v1.b;
+				var s1 = _v1.c;
+				return A3($elm$parser$Parser$Advanced$Good, false, a, s1);
+			}
+		});
+};
+var $elm$parser$Parser$backtrackable = $elm$parser$Parser$Advanced$backtrackable;
 var $elm_community$basics_extra$Basics$Extra$flip = F3(
 	function (f, b, a) {
 		return A2(f, a, b);
 	});
+var $elm$parser$Parser$Advanced$mapChompedString = F2(
+	function (func, _v0) {
+		var parse = _v0.a;
+		return $elm$parser$Parser$Advanced$Parser(
+			function (s0) {
+				var _v1 = parse(s0);
+				if (_v1.$ === 'Bad') {
+					var p = _v1.a;
+					var x = _v1.b;
+					return A2($elm$parser$Parser$Advanced$Bad, p, x);
+				} else {
+					var p = _v1.a;
+					var a = _v1.b;
+					var s1 = _v1.c;
+					return A3(
+						$elm$parser$Parser$Advanced$Good,
+						p,
+						A2(
+							func,
+							A3($elm$core$String$slice, s0.offset, s1.offset, s0.src),
+							a),
+						s1);
+				}
+			});
+	});
+var $elm$parser$Parser$Advanced$getChompedString = function (parser) {
+	return A2($elm$parser$Parser$Advanced$mapChompedString, $elm$core$Basics$always, parser);
+};
+var $elm$parser$Parser$getChompedString = $elm$parser$Parser$Advanced$getChompedString;
 var $elm$parser$Parser$Advanced$map2 = F3(
 	function (func, _v0, _v1) {
 		var parseA = _v0.a;
@@ -11139,6 +11190,191 @@ var $elm$parser$Parser$Advanced$ignorer = F2(
 		return A3($elm$parser$Parser$Advanced$map2, $elm$core$Basics$always, keepParser, ignoreParser);
 	});
 var $elm$parser$Parser$ignorer = $elm$parser$Parser$Advanced$ignorer;
+var $author$project$Frontend$SCInt = function (a) {
+	return {$: 'SCInt', a: a};
+};
+var $elm$parser$Parser$ExpectingBinary = {$: 'ExpectingBinary'};
+var $elm$parser$Parser$ExpectingFloat = {$: 'ExpectingFloat'};
+var $elm$parser$Parser$ExpectingHex = {$: 'ExpectingHex'};
+var $elm$parser$Parser$ExpectingInt = {$: 'ExpectingInt'};
+var $elm$parser$Parser$ExpectingNumber = {$: 'ExpectingNumber'};
+var $elm$parser$Parser$ExpectingOctal = {$: 'ExpectingOctal'};
+var $elm$core$Result$fromMaybe = F2(
+	function (err, maybe) {
+		if (maybe.$ === 'Just') {
+			var v = maybe.a;
+			return $elm$core$Result$Ok(v);
+		} else {
+			return $elm$core$Result$Err(err);
+		}
+	});
+var $elm$parser$Parser$Advanced$consumeBase = _Parser_consumeBase;
+var $elm$parser$Parser$Advanced$consumeBase16 = _Parser_consumeBase16;
+var $elm$parser$Parser$Advanced$bumpOffset = F2(
+	function (newOffset, s) {
+		return {col: s.col + (newOffset - s.offset), context: s.context, indent: s.indent, offset: newOffset, row: s.row, src: s.src};
+	});
+var $elm$parser$Parser$Advanced$chompBase10 = _Parser_chompBase10;
+var $elm$parser$Parser$Advanced$isAsciiCode = _Parser_isAsciiCode;
+var $elm$parser$Parser$Advanced$consumeExp = F2(
+	function (offset, src) {
+		if (A3($elm$parser$Parser$Advanced$isAsciiCode, 101, offset, src) || A3($elm$parser$Parser$Advanced$isAsciiCode, 69, offset, src)) {
+			var eOffset = offset + 1;
+			var expOffset = (A3($elm$parser$Parser$Advanced$isAsciiCode, 43, eOffset, src) || A3($elm$parser$Parser$Advanced$isAsciiCode, 45, eOffset, src)) ? (eOffset + 1) : eOffset;
+			var newOffset = A2($elm$parser$Parser$Advanced$chompBase10, expOffset, src);
+			return _Utils_eq(expOffset, newOffset) ? (-newOffset) : newOffset;
+		} else {
+			return offset;
+		}
+	});
+var $elm$parser$Parser$Advanced$consumeDotAndExp = F2(
+	function (offset, src) {
+		return A3($elm$parser$Parser$Advanced$isAsciiCode, 46, offset, src) ? A2(
+			$elm$parser$Parser$Advanced$consumeExp,
+			A2($elm$parser$Parser$Advanced$chompBase10, offset + 1, src),
+			src) : A2($elm$parser$Parser$Advanced$consumeExp, offset, src);
+	});
+var $elm$parser$Parser$Advanced$finalizeInt = F5(
+	function (invalid, handler, startOffset, _v0, s) {
+		var endOffset = _v0.a;
+		var n = _v0.b;
+		if (handler.$ === 'Err') {
+			var x = handler.a;
+			return A2(
+				$elm$parser$Parser$Advanced$Bad,
+				true,
+				A2($elm$parser$Parser$Advanced$fromState, s, x));
+		} else {
+			var toValue = handler.a;
+			return _Utils_eq(startOffset, endOffset) ? A2(
+				$elm$parser$Parser$Advanced$Bad,
+				_Utils_cmp(s.offset, startOffset) < 0,
+				A2($elm$parser$Parser$Advanced$fromState, s, invalid)) : A3(
+				$elm$parser$Parser$Advanced$Good,
+				true,
+				toValue(n),
+				A2($elm$parser$Parser$Advanced$bumpOffset, endOffset, s));
+		}
+	});
+var $elm$parser$Parser$Advanced$fromInfo = F4(
+	function (row, col, x, context) {
+		return A2(
+			$elm$parser$Parser$Advanced$AddRight,
+			$elm$parser$Parser$Advanced$Empty,
+			A4($elm$parser$Parser$Advanced$DeadEnd, row, col, x, context));
+	});
+var $elm$core$String$toFloat = _String_toFloat;
+var $elm$parser$Parser$Advanced$finalizeFloat = F6(
+	function (invalid, expecting, intSettings, floatSettings, intPair, s) {
+		var intOffset = intPair.a;
+		var floatOffset = A2($elm$parser$Parser$Advanced$consumeDotAndExp, intOffset, s.src);
+		if (floatOffset < 0) {
+			return A2(
+				$elm$parser$Parser$Advanced$Bad,
+				true,
+				A4($elm$parser$Parser$Advanced$fromInfo, s.row, s.col - (floatOffset + s.offset), invalid, s.context));
+		} else {
+			if (_Utils_eq(s.offset, floatOffset)) {
+				return A2(
+					$elm$parser$Parser$Advanced$Bad,
+					false,
+					A2($elm$parser$Parser$Advanced$fromState, s, expecting));
+			} else {
+				if (_Utils_eq(intOffset, floatOffset)) {
+					return A5($elm$parser$Parser$Advanced$finalizeInt, invalid, intSettings, s.offset, intPair, s);
+				} else {
+					if (floatSettings.$ === 'Err') {
+						var x = floatSettings.a;
+						return A2(
+							$elm$parser$Parser$Advanced$Bad,
+							true,
+							A2($elm$parser$Parser$Advanced$fromState, s, invalid));
+					} else {
+						var toValue = floatSettings.a;
+						var _v1 = $elm$core$String$toFloat(
+							A3($elm$core$String$slice, s.offset, floatOffset, s.src));
+						if (_v1.$ === 'Nothing') {
+							return A2(
+								$elm$parser$Parser$Advanced$Bad,
+								true,
+								A2($elm$parser$Parser$Advanced$fromState, s, invalid));
+						} else {
+							var n = _v1.a;
+							return A3(
+								$elm$parser$Parser$Advanced$Good,
+								true,
+								toValue(n),
+								A2($elm$parser$Parser$Advanced$bumpOffset, floatOffset, s));
+						}
+					}
+				}
+			}
+		}
+	});
+var $elm$parser$Parser$Advanced$number = function (c) {
+	return $elm$parser$Parser$Advanced$Parser(
+		function (s) {
+			if (A3($elm$parser$Parser$Advanced$isAsciiCode, 48, s.offset, s.src)) {
+				var zeroOffset = s.offset + 1;
+				var baseOffset = zeroOffset + 1;
+				return A3($elm$parser$Parser$Advanced$isAsciiCode, 120, zeroOffset, s.src) ? A5(
+					$elm$parser$Parser$Advanced$finalizeInt,
+					c.invalid,
+					c.hex,
+					baseOffset,
+					A2($elm$parser$Parser$Advanced$consumeBase16, baseOffset, s.src),
+					s) : (A3($elm$parser$Parser$Advanced$isAsciiCode, 111, zeroOffset, s.src) ? A5(
+					$elm$parser$Parser$Advanced$finalizeInt,
+					c.invalid,
+					c.octal,
+					baseOffset,
+					A3($elm$parser$Parser$Advanced$consumeBase, 8, baseOffset, s.src),
+					s) : (A3($elm$parser$Parser$Advanced$isAsciiCode, 98, zeroOffset, s.src) ? A5(
+					$elm$parser$Parser$Advanced$finalizeInt,
+					c.invalid,
+					c.binary,
+					baseOffset,
+					A3($elm$parser$Parser$Advanced$consumeBase, 2, baseOffset, s.src),
+					s) : A6(
+					$elm$parser$Parser$Advanced$finalizeFloat,
+					c.invalid,
+					c.expecting,
+					c._int,
+					c._float,
+					_Utils_Tuple2(zeroOffset, 0),
+					s)));
+			} else {
+				return A6(
+					$elm$parser$Parser$Advanced$finalizeFloat,
+					c.invalid,
+					c.expecting,
+					c._int,
+					c._float,
+					A3($elm$parser$Parser$Advanced$consumeBase, 10, s.offset, s.src),
+					s);
+			}
+		});
+};
+var $elm$parser$Parser$number = function (i) {
+	return $elm$parser$Parser$Advanced$number(
+		{
+			binary: A2($elm$core$Result$fromMaybe, $elm$parser$Parser$ExpectingBinary, i.binary),
+			expecting: $elm$parser$Parser$ExpectingNumber,
+			_float: A2($elm$core$Result$fromMaybe, $elm$parser$Parser$ExpectingFloat, i._float),
+			hex: A2($elm$core$Result$fromMaybe, $elm$parser$Parser$ExpectingHex, i.hex),
+			_int: A2($elm$core$Result$fromMaybe, $elm$parser$Parser$ExpectingInt, i._int),
+			invalid: $elm$parser$Parser$ExpectingNumber,
+			octal: A2($elm$core$Result$fromMaybe, $elm$parser$Parser$ExpectingOctal, i.octal)
+		});
+};
+var $author$project$Frontend$intLit = $elm$parser$Parser$number(
+	{
+		binary: $elm$core$Maybe$Nothing,
+		_float: $elm$core$Maybe$Nothing,
+		hex: $elm$core$Maybe$Nothing,
+		_int: $elm$core$Maybe$Just($author$project$Frontend$SCInt),
+		octal: $elm$core$Maybe$Nothing
+	});
 var $elm$parser$Parser$Advanced$keeper = F2(
 	function (parseFunc, parseArg) {
 		return A3($elm$parser$Parser$Advanced$map2, $elm$core$Basics$apL, parseFunc, parseArg);
@@ -11219,9 +11455,6 @@ var $elm$parser$Parser$Advanced$oneOf = function (parsers) {
 		});
 };
 var $elm$parser$Parser$oneOf = $elm$parser$Parser$Advanced$oneOf;
-var $author$project$Frontend$SCIdent = function (a) {
-	return {$: 'SCIdent', a: a};
-};
 var $elm$core$Set$Set_elm_builtin = function (a) {
 	return {$: 'Set_elm_builtin', a: a};
 };
@@ -11535,6 +11768,89 @@ var $elm$parser$Parser$symbol = function (str) {
 			$elm$parser$Parser$ExpectingSymbol(str)));
 };
 function $author$project$Frontend$cyclic$expr() {
+	return $author$project$Frontend$cyclic$arith();
+}
+function $author$project$Frontend$cyclic$arith() {
+	var operation = A2(
+		$elm$parser$Parser$keeper,
+		A2(
+			$elm$parser$Parser$keeper,
+			A2(
+				$elm$parser$Parser$keeper,
+				$elm$parser$Parser$succeed(
+					F3(
+						function (left, op, right) {
+							return A2(
+								$author$project$Frontend$SCApp,
+								A2(
+									$author$project$Frontend$SCApp,
+									$author$project$Frontend$SCIdent(op),
+									left),
+								right);
+						})),
+				A2(
+					$elm$parser$Parser$ignorer,
+					$author$project$Frontend$cyclic$arith1(),
+					$elm$parser$Parser$spaces)),
+			A2(
+				$elm$parser$Parser$ignorer,
+				$elm$parser$Parser$getChompedString(
+					$elm$parser$Parser$oneOf(
+						_List_fromArray(
+							[
+								$elm$parser$Parser$symbol('+'),
+								$elm$parser$Parser$symbol('-')
+							]))),
+				$elm$parser$Parser$spaces)),
+		$author$project$Frontend$cyclic$arith1());
+	return $elm$parser$Parser$oneOf(
+		_List_fromArray(
+			[
+				$elm$parser$Parser$backtrackable(operation),
+				$author$project$Frontend$cyclic$arith1()
+			]));
+}
+function $author$project$Frontend$cyclic$arith1() {
+	var operation = A2(
+		$elm$parser$Parser$keeper,
+		A2(
+			$elm$parser$Parser$keeper,
+			A2(
+				$elm$parser$Parser$keeper,
+				$elm$parser$Parser$succeed(
+					F3(
+						function (left, op, right) {
+							return A2(
+								$author$project$Frontend$SCApp,
+								A2(
+									$author$project$Frontend$SCApp,
+									$author$project$Frontend$SCIdent(op),
+									left),
+								right);
+						})),
+				A2(
+					$elm$parser$Parser$ignorer,
+					$author$project$Frontend$cyclic$app(),
+					$elm$parser$Parser$spaces)),
+			A2(
+				$elm$parser$Parser$ignorer,
+				$elm$parser$Parser$getChompedString(
+					$elm$parser$Parser$oneOf(
+						_List_fromArray(
+							[
+								$elm$parser$Parser$symbol('*'),
+								$elm$parser$Parser$symbol('/')
+							]))),
+				$elm$parser$Parser$spaces)),
+		$author$project$Frontend$cyclic$app());
+	return $elm$parser$Parser$oneOf(
+		_List_fromArray(
+			[
+				$elm$parser$Parser$backtrackable(operation),
+				$author$project$Frontend$cyclic$app()
+			]));
+}
+function $author$project$Frontend$cyclic$app() {
 	return A2(
 		$elm$parser$Parser$map,
 		function (_v1) {
@@ -11557,6 +11873,7 @@ function $author$project$Frontend$cyclic$term() {
 		_List_fromArray(
 			[
 				$author$project$Frontend$scident,
+				$author$project$Frontend$intLit,
 				$author$project$Frontend$cyclic$group()
 			]));
 }
@@ -11586,6 +11903,18 @@ try {
 	$author$project$Frontend$cyclic$expr = function () {
 		return $author$project$Frontend$expr;
 	};
+	var $author$project$Frontend$arith = $author$project$Frontend$cyclic$arith();
+	$author$project$Frontend$cyclic$arith = function () {
+		return $author$project$Frontend$arith;
+	};
+	var $author$project$Frontend$arith1 = $author$project$Frontend$cyclic$arith1();
+	$author$project$Frontend$cyclic$arith1 = function () {
+		return $author$project$Frontend$arith1;
+	};
+	var $author$project$Frontend$app = $author$project$Frontend$cyclic$app();
+	$author$project$Frontend$cyclic$app = function () {
+		return $author$project$Frontend$app;
+	};
 	var $author$project$Frontend$term = $author$project$Frontend$cyclic$term();
 	$author$project$Frontend$cyclic$term = function () {
 		return $author$project$Frontend$term;
@@ -11595,7 +11924,7 @@ try {
 		return $author$project$Frontend$group;
 	};
 } catch ($) {
-	throw 'Some top-level definitions from `Frontend` are causing infinite recursion:\n\n  ┌─────┐\n  │    expr\n  │     ↓\n  │    term\n  │     ↓\n  │    group\n  └─────┘\n\nThese errors are very tricky, so read https://elm-lang.org/0.19.1/bad-recursion to learn how to fix it!';}
+	throw 'Some top-level definitions from `Frontend` are causing infinite recursion:\n\n  ┌─────┐\n  │    expr\n  │     ↓\n  │    arith\n  │     ↓\n  │    arith1\n  │     ↓\n  │    app\n  │     ↓\n  │    term\n  │     ↓\n  │    group\n  └─────┘\n\nThese errors are very tricky, so read https://elm-lang.org/0.19.1/bad-recursion to learn how to fix it!';}
 var $elm$parser$Parser$Mandatory = {$: 'Mandatory'};
 var $elm$parser$Parser$Advanced$andThen = F2(
 	function (callback, _v0) {
@@ -11955,16 +12284,108 @@ var $author$project$Frontend$parse = function (sourceProgram) {
 				A2($elm$core$Basics$composeL, $elm$core$Basics$not, $elm_community$string_extra$String$Extra$isBlank),
 				$elm$core$String$lines(sourceProgram))));
 };
-var $author$project$Backend$compile = function (source) {
-	return A2(
-		$elm$core$Result$andThen,
-		$author$project$Backend$compileASTs,
-		A2(
-			$elm$core$Result$mapError,
-			$author$project$Backend$ParseFailure,
-			$author$project$Frontend$parse(source)));
-};
-var $author$project$GMachine$emptyMachine = {code: _List_Nil, dump: _List_Nil, env: $author$project$Backend$emptyEnv, graph: $elm$core$Dict$empty, nodeCounter: 0, stack: _List_Nil, unwinding: false};
+var $author$project$Backend$compile = A2(
+	$elm$core$Basics$composeR,
+	$author$project$Frontend$parse,
+	A2(
+		$elm$core$Basics$composeR,
+		$elm$core$Result$mapError($author$project$Backend$ParseFailure),
+		$elm$core$Result$andThen($author$project$Backend$compileASTs)));
+var $author$project$Backend$ADD = {$: 'ADD'};
+var $author$project$Backend$DIV = {$: 'DIV'};
+var $author$project$Backend$EQU = {$: 'EQU'};
+var $author$project$Backend$EVAL = {$: 'EVAL'};
+var $author$project$Backend$Global = F3(
+	function (name, numFormals, code) {
+		return {code: code, name: name, numFormals: numFormals};
+	});
+var $author$project$Backend$MUL = {$: 'MUL'};
+var $author$project$Backend$SUB = {$: 'SUB'};
+var $author$project$Backend$stdLib = A3(
+	$elm$core$List$foldl,
+	function (def) {
+		return A2($elm$core$Dict$insert, def.name, def);
+	},
+	$author$project$Backend$emptyEnv,
+	_List_fromArray(
+		[
+			A3(
+			$author$project$Backend$Global,
+			'+',
+			2,
+			_List_fromArray(
+				[
+					$author$project$Backend$PUSHARG(2),
+					$author$project$Backend$EVAL,
+					$author$project$Backend$PUSHARG(2),
+					$author$project$Backend$EVAL,
+					$author$project$Backend$ADD,
+					$author$project$Backend$UPDATE(3),
+					$author$project$Backend$POP(2),
+					$author$project$Backend$UNWIND
+				])),
+			A3(
+			$author$project$Backend$Global,
+			'-',
+			2,
+			_List_fromArray(
+				[
+					$author$project$Backend$PUSHARG(2),
+					$author$project$Backend$EVAL,
+					$author$project$Backend$PUSHARG(2),
+					$author$project$Backend$EVAL,
+					$author$project$Backend$SUB,
+					$author$project$Backend$UPDATE(3),
+					$author$project$Backend$POP(2),
+					$author$project$Backend$UNWIND
+				])),
+			A3(
+			$author$project$Backend$Global,
+			'*',
+			2,
+			_List_fromArray(
+				[
+					$author$project$Backend$PUSHARG(2),
+					$author$project$Backend$EVAL,
+					$author$project$Backend$PUSHARG(2),
+					$author$project$Backend$EVAL,
+					$author$project$Backend$MUL,
+					$author$project$Backend$UPDATE(3),
+					$author$project$Backend$POP(2),
+					$author$project$Backend$UNWIND
+				])),
+			A3(
+			$author$project$Backend$Global,
+			'/',
+			2,
+			_List_fromArray(
+				[
+					$author$project$Backend$PUSHARG(2),
+					$author$project$Backend$EVAL,
+					$author$project$Backend$PUSHARG(2),
+					$author$project$Backend$EVAL,
+					$author$project$Backend$DIV,
+					$author$project$Backend$UPDATE(3),
+					$author$project$Backend$POP(2),
+					$author$project$Backend$UNWIND
+				])),
+			A3(
+			$author$project$Backend$Global,
+			'==',
+			2,
+			_List_fromArray(
+				[
+					$author$project$Backend$PUSHARG(2),
+					$author$project$Backend$EVAL,
+					$author$project$Backend$PUSHARG(2),
+					$author$project$Backend$EVAL,
+					$author$project$Backend$EQU,
+					$author$project$Backend$UPDATE(3),
+					$author$project$Backend$POP(2),
+					$author$project$Backend$UNWIND
+				]))
+		]));
+var $author$project$GMachine$emptyMachine = {builtins: $author$project$Backend$stdLib, code: _List_Nil, dump: _List_Nil, env: $author$project$Backend$emptyEnv, graph: $elm$core$Dict$empty, nodeCounter: 0, stack: _List_Nil, unwinding: false};
 var $author$project$GMachine$incNodeCounter = function (gmachine) {
 	return _Utils_update(
 		gmachine,
@@ -12001,12 +12422,6 @@ var $author$project$GMachine$setCode = F2(
 			gmachine,
 			{code: code});
 	});
-var $author$project$GMachine$setDump = F2(
-	function (dump, gmachine) {
-		return _Utils_update(
-			gmachine,
-			{dump: dump});
-	});
 var $author$project$GMachine$setEnv = F2(
 	function (env, gmachine) {
 		return _Utils_update(
@@ -12022,18 +12437,12 @@ var $author$project$GMachine$createMachine = function (source) {
 				var mainFunction = _v0.a;
 				return (!(!mainFunction.numFormals)) ? $elm$core$Result$Err($author$project$Backend$MainFunctionCannotHaveFormals) : $elm$core$Result$Ok(
 					A2(
-						$author$project$GMachine$setDump,
-						_List_fromArray(
-							[
-								_Utils_Tuple2(_List_Nil, _List_Nil)
-							]),
+						$author$project$GMachine$setCode,
+						mainFunction.code,
 						A2(
-							$author$project$GMachine$setCode,
-							mainFunction.code,
-							A2(
-								$author$project$GMachine$mkNodeAndPush,
-								$author$project$GMachine$GFunc(mainFunction),
-								A2($author$project$GMachine$setEnv, env, $author$project$GMachine$emptyMachine)))));
+							$author$project$GMachine$mkNodeAndPush,
+							$author$project$GMachine$GFunc(mainFunction),
+							A2($author$project$GMachine$setEnv, env, $author$project$GMachine$emptyMachine))));
 			} else {
 				return $elm$core$Result$Err($author$project$Backend$CannotFindMainFunction);
 			}
@@ -12075,7 +12484,7 @@ var $author$project$Main$compileSourceCode = function (model) {
 		$author$project$GMachine$createMachine(model.sourceCode));
 };
 var $elm$browser$Browser$Dom$getViewport = _Browser_withWindow(_Browser_getViewport);
-var $author$project$Main$initialProgram = '\nI x = x\n\nK x y = x\n\nS x y z = (x z) (y z)\n\nmain = S I I K\n';
+var $author$project$Main$initialProgram = '\nmin x y = x - y\ndouble x = x + x\n\nmain = double (min 10 3)\n';
 var $elm$core$Basics$round = _Basics_round;
 var $author$project$Main$init = _Utils_Tuple2(
 	$author$project$Main$compileSourceCode(
@@ -17994,18 +18403,18 @@ var $author$project$GMachine$setUnwinding = F2(
 			gmachine,
 			{unwinding: flag});
 	});
-var $author$project$GMachine$EmptyDump = {$: 'EmptyDump'};
 var $author$project$GMachine$GApp = F2(
 	function (a, b) {
 		return {$: 'GApp', a: a, b: b};
 	});
 var $author$project$GMachine$GHole = {$: 'GHole'};
-var $author$project$GMachine$MissingArgument = {$: 'MissingArgument'};
-var $author$project$GMachine$OutOfBoundsStack = {$: 'OutOfBoundsStack'};
-var $author$project$GMachine$UnexpectedHole = {$: 'UnexpectedHole'};
-var $author$project$GMachine$UnknownName = function (a) {
-	return {$: 'UnknownName', a: a};
+var $author$project$GMachine$GInt = function (a) {
+	return {$: 'GInt', a: a};
 };
+var $author$project$GMachine$UnexpectedNode = F2(
+	function (a, b) {
+		return {$: 'UnexpectedNode', a: a, b: b};
+	});
 var $author$project$Funcs$applyN = F3(
 	function (f, num, initial) {
 		applyN:
@@ -18023,23 +18432,16 @@ var $author$project$Funcs$applyN = F3(
 			}
 		}
 	});
-var $elm$core$Result$fromMaybe = F2(
-	function (err, maybe) {
-		if (maybe.$ === 'Just') {
-			var v = maybe.a;
-			return $elm$core$Result$Ok(v);
-		} else {
-			return $elm$core$Result$Err(err);
-		}
-	});
+var $author$project$GMachine$MissingArgument = {$: 'MissingArgument'};
 var $author$project$GMachine$getArg = function (node) {
 	if (node.$ === 'GApp') {
 		var arg = node.b;
-		return $elm$core$Maybe$Just(arg);
+		return $elm$core$Result$Ok(arg);
 	} else {
-		return $elm$core$Maybe$Nothing;
+		return $elm$core$Result$Err($author$project$GMachine$MissingArgument);
 	}
 };
+var $author$project$GMachine$OutOfBoundsStack = {$: 'OutOfBoundsStack'};
 var $elm$core$List$head = function (list) {
 	if (list.b) {
 		var x = list.a;
@@ -18054,6 +18456,16 @@ var $elm_community$list_extra$List$Extra$getAt = F2(
 		return (idx < 0) ? $elm$core$Maybe$Nothing : $elm$core$List$head(
 			A2($elm$core$List$drop, idx, xs));
 	});
+var $author$project$GMachine$getFromStack = F2(
+	function (stack, offset) {
+		return A2(
+			$elm$core$Result$fromMaybe,
+			$author$project$GMachine$OutOfBoundsStack,
+			A2($elm_community$list_extra$List$Extra$getAt, offset, stack));
+	});
+var $author$project$GMachine$getTopVal = function (stack) {
+	return A2($author$project$GMachine$getFromStack, stack, 0);
+};
 var $elm$core$Result$map = F2(
 	function (func, ra) {
 		if (ra.$ === 'Ok') {
@@ -18065,25 +18477,6 @@ var $elm$core$Result$map = F2(
 			return $elm$core$Result$Err(e);
 		}
 	});
-var $author$project$GMachine$NodeDoesNotExist = function (a) {
-	return {$: 'NodeDoesNotExist', a: a};
-};
-var $author$project$GMachine$retrieveNode = F2(
-	function (gmachine, node) {
-		return A2(
-			$elm$core$Result$fromMaybe,
-			$author$project$GMachine$NodeDoesNotExist(node),
-			A2($elm$core$Dict$get, node, gmachine.graph));
-	});
-var $author$project$GMachine$peekNodeOnStack = function (gmachine) {
-	return A2(
-		$elm$core$Result$andThen,
-		$author$project$GMachine$retrieveNode(gmachine),
-		A2(
-			$elm$core$Result$fromMaybe,
-			$author$project$GMachine$EmptyStack,
-			$elm$core$List$head(gmachine.stack)));
-};
 var $author$project$GMachine$pop = F2(
 	function (num, gmachine) {
 		return _Utils_update(
@@ -18103,12 +18496,105 @@ var $author$project$GMachine$pushContextToDump = F3(
 					gmachine.dump)
 			});
 	});
+var $author$project$GMachine$UnknownName = function (a) {
+	return {$: 'UnknownName', a: a};
+};
+var $elm_community$maybe_extra$Maybe$Extra$oneOf = F2(
+	function (fmbs, a) {
+		oneOf:
+		while (true) {
+			if (!fmbs.b) {
+				return $elm$core$Maybe$Nothing;
+			} else {
+				var fmb = fmbs.a;
+				var rest = fmbs.b;
+				var _v1 = fmb(a);
+				if (_v1.$ === 'Just') {
+					var b = _v1.a;
+					return $elm$core$Maybe$Just(b);
+				} else {
+					var $temp$fmbs = rest,
+						$temp$a = a;
+					fmbs = $temp$fmbs;
+					a = $temp$a;
+					continue oneOf;
+				}
+			}
+		}
+	});
+var $author$project$GMachine$retrieveGlobal = F2(
+	function (name, _v0) {
+		var env = _v0.env;
+		var builtins = _v0.builtins;
+		return A2(
+			$elm$core$Result$fromMaybe,
+			$author$project$GMachine$UnknownName(name),
+			A2(
+				$elm_community$maybe_extra$Maybe$Extra$oneOf,
+				_List_fromArray(
+					[
+						A2($elm_community$basics_extra$Basics$Extra$flip, $author$project$Backend$getGlobal, env),
+						A2($elm_community$basics_extra$Basics$Extra$flip, $author$project$Backend$getGlobal, builtins)
+					]),
+				name));
+	});
+var $author$project$GMachine$NodeDoesNotExist = function (a) {
+	return {$: 'NodeDoesNotExist', a: a};
+};
+var $author$project$GMachine$retrieveNode = F2(
+	function (gmachine, node) {
+		return A2(
+			$elm$core$Result$fromMaybe,
+			$author$project$GMachine$NodeDoesNotExist(node),
+			A2($elm$core$Dict$get, node, gmachine.graph));
+	});
+var $author$project$GMachine$setDump = F2(
+	function (dump, gmachine) {
+		return _Utils_update(
+			gmachine,
+			{dump: dump});
+	});
 var $author$project$GMachine$setStack = F2(
 	function (stack, gmachine) {
 		return _Utils_update(
 			gmachine,
 			{stack: stack});
 	});
+var $elm_community$list_extra$List$Extra$uncons = function (list) {
+	if (!list.b) {
+		return $elm$core$Maybe$Nothing;
+	} else {
+		var first = list.a;
+		var rest = list.b;
+		return $elm$core$Maybe$Just(
+			_Utils_Tuple2(first, rest));
+	}
+};
+var $author$project$GMachine$return = F2(
+	function (retVal, gmachine) {
+		var _v0 = A2(
+			$elm$core$Maybe$withDefault,
+			_Utils_Tuple2(
+				_Utils_Tuple2(_List_Nil, _List_Nil),
+				_List_Nil),
+			$elm_community$list_extra$List$Extra$uncons(gmachine.dump));
+		var _v1 = _v0.a;
+		var oldStack = _v1.a;
+		var oldCode = _v1.b;
+		var dump = _v0.b;
+		return $elm$core$Result$Ok(
+			A2(
+				$author$project$GMachine$push,
+				retVal,
+				A2(
+					$author$project$GMachine$setDump,
+					dump,
+					A2(
+						$author$project$GMachine$setCode,
+						oldCode,
+						A2($author$project$GMachine$setStack, oldStack, gmachine)))));
+	});
+var $author$project$GMachine$runtimeResult = A2($elm_community$result_extra$Result$Extra$unpack, $author$project$GMachine$Crash, $author$project$GMachine$Running);
 var $elm$core$List$takeReverse = F3(
 	function (n, list, kept) {
 		takeReverse:
@@ -18240,28 +18726,33 @@ var $author$project$GMachine$stateTransition = F2(
 		var stack = gmachine.stack;
 		var code = gmachine.code;
 		var dump = gmachine.dump;
-		var env = gmachine.env;
-		var _v0 = _Utils_Tuple2(
-			instruction,
-			$author$project$GMachine$peekNodeOnStack(gmachine));
-		_v0$14:
+		var topMostNode = A2(
+			$elm$core$Result$andThen,
+			$author$project$GMachine$retrieveNode(gmachine),
+			$author$project$GMachine$getTopVal(stack));
+		var sndTopMostNode = A2(
+			$elm$core$Result$andThen,
+			$author$project$GMachine$retrieveNode(gmachine),
+			A2($author$project$GMachine$getFromStack, stack, 1));
+		var _v0 = _Utils_Tuple3(instruction, topMostNode, sndTopMostNode);
+		_v0$20:
 		while (true) {
 			switch (_v0.a.$) {
 				case 'PUSHGLOBAL':
 					var name = _v0.a.a;
-					var _v1 = A2($author$project$Backend$getGlobal, name, env);
-					if (_v1.$ === 'Nothing') {
-						return $elm$core$Result$Err(
-							$author$project$GMachine$UnknownName(name));
-					} else {
-						var global = _v1.a;
-						var node = $author$project$GMachine$GFunc(global);
-						return $elm$core$Result$Ok(
-							A2($author$project$GMachine$mkNodeAndPush, node, gmachine));
-					}
+					return $author$project$GMachine$runtimeResult(
+						A2(
+							$elm$core$Result$map,
+							function (global) {
+								return A2(
+									$author$project$GMachine$mkNodeAndPush,
+									$author$project$GMachine$GFunc(global),
+									gmachine);
+							},
+							A2($author$project$GMachine$retrieveGlobal, name, gmachine)));
 				case 'ALLOC':
 					var num = _v0.a.a;
-					return $elm$core$Result$Ok(
+					return $author$project$GMachine$Running(
 						A3(
 							$author$project$Funcs$applyN,
 							$author$project$GMachine$mkNodeAndPush($author$project$GMachine$GHole),
@@ -18271,9 +18762,9 @@ var $author$project$GMachine$stateTransition = F2(
 					if (_v0.b.$ === 'Ok') {
 						switch (_v0.b.a.$) {
 							case 'GApp':
-								var _v2 = _v0.a;
-								var _v3 = _v0.b.a;
-								return $elm$core$Result$Ok(
+								var _v1 = _v0.a;
+								var _v2 = _v0.b.a;
+								return $author$project$GMachine$Running(
 									A3(
 										$author$project$GMachine$pushContextToDump,
 										A2($elm$core$List$drop, 1, stack),
@@ -18287,9 +18778,9 @@ var $author$project$GMachine$stateTransition = F2(
 												A2($elm$core$List$take, 1, stack),
 												gmachine))));
 							case 'GFunc':
-								var _v4 = _v0.a;
+								var _v3 = _v0.a;
 								var global = _v0.b.a.a;
-								return (!global.numFormals) ? $elm$core$Result$Ok(
+								return (!global.numFormals) ? $author$project$GMachine$Running(
 									A3(
 										$author$project$GMachine$pushContextToDump,
 										A2($elm$core$List$drop, 1, stack),
@@ -18300,52 +18791,50 @@ var $author$project$GMachine$stateTransition = F2(
 											A2(
 												$author$project$GMachine$setStack,
 												A2($elm$core$List$take, 1, stack),
-												gmachine)))) : $elm$core$Result$Ok(gmachine);
+												gmachine)))) : $author$project$GMachine$Running(gmachine);
+							case 'GInt':
+								var _v4 = _v0.a;
+								return $author$project$GMachine$Running(gmachine);
 							default:
-								var _v5 = _v0.a;
-								var _v6 = _v0.b.a;
-								return $elm$core$Result$Err($author$project$GMachine$UnexpectedHole);
+								break _v0$20;
 						}
 					} else {
-						break _v0$14;
+						break _v0$20;
 					}
 				case 'UNWIND':
 					if (_v0.b.$ === 'Ok') {
 						switch (_v0.b.a.$) {
 							case 'GApp':
-								var _v7 = _v0.a;
-								var _v8 = _v0.b.a;
-								var n1 = _v8.a;
-								var n2 = _v8.b;
-								return $elm$core$Result$Ok(
+								var _v5 = _v0.a;
+								var _v6 = _v0.b.a;
+								var n1 = _v6.a;
+								var n2 = _v6.b;
+								return $author$project$GMachine$Running(
 									A2(
 										$author$project$GMachine$setCode,
 										_List_fromArray(
 											[$author$project$Backend$UNWIND]),
 										A2($author$project$GMachine$push, n1, gmachine)));
 							case 'GFunc':
-								var _v9 = _v0.a;
+								var _v7 = _v0.a;
 								var global = _v0.b.a.a;
 								var enoughArguments = _Utils_cmp(
-									$elm$core$List$length(stack) + 1,
-									global.numFormals) > -1;
+									$elm$core$List$length(stack),
+									global.numFormals) > 0;
 								if (enoughArguments) {
-									return $elm$core$Result$Ok(
+									return $author$project$GMachine$Running(
 										A2($author$project$GMachine$setCode, global.code, gmachine));
 								} else {
-									var _v10 = _Utils_Tuple2(
-										$elm$core$List$reverse(stack),
-										dump);
-									if (_v10.a.b) {
-										if (_v10.b.b) {
-											var _v11 = _v10.a;
-											var redexRoot = _v11.a;
-											var _v12 = _v10.b;
-											var _v13 = _v12.a;
-											var oldStack = _v13.a;
-											var oldCode = _v13.b;
-											var dump_ = _v12.b;
-											return $elm$core$Result$Ok(
+									var _v8 = $elm$core$List$head(
+										$elm$core$List$reverse(stack));
+									if (_v8.$ === 'Just') {
+										var redexRoot = _v8.a;
+										if (dump.b) {
+											var _v10 = dump.a;
+											var oldStack = _v10.a;
+											var oldCode = _v10.b;
+											var dump_ = dump.b;
+											return $author$project$GMachine$Running(
 												A2(
 													$author$project$GMachine$setDump,
 													dump_,
@@ -18357,107 +18846,182 @@ var $author$project$GMachine$stateTransition = F2(
 															A2($elm$core$List$cons, redexRoot, oldStack),
 															gmachine))));
 										} else {
-											return $elm$core$Result$Err($author$project$GMachine$EmptyDump);
+											return A2($author$project$GMachine$Terminated, redexRoot, gmachine.graph);
 										}
 									} else {
-										return $elm$core$Result$Err($author$project$GMachine$EmptyStack);
+										return $author$project$GMachine$Crash($author$project$GMachine$EmptyStack);
 									}
 								}
+							case 'GInt':
+								var _v11 = _v0.a;
+								return $author$project$GMachine$runtimeResult(
+									A2(
+										$elm$core$Result$andThen,
+										A2($elm_community$basics_extra$Basics$Extra$flip, $author$project$GMachine$return, gmachine),
+										$author$project$GMachine$getTopVal(stack)));
 							default:
-								var _v14 = _v0.a;
-								var _v15 = _v0.b.a;
-								return $elm$core$Result$Err($author$project$GMachine$UnexpectedHole);
+								break _v0$20;
 						}
 					} else {
-						break _v0$14;
+						break _v0$20;
 					}
 				case 'UPDATE':
 					if (_v0.b.$ === 'Ok') {
 						var k = _v0.a.a;
 						var nodeOnTop = _v0.b.a;
-						var nodeToReplace = A2(
-							$elm$core$Result$fromMaybe,
-							$author$project$GMachine$OutOfBoundsStack,
-							A2($elm_community$list_extra$List$Extra$getAt, k, stack));
-						return A2(
-							$elm$core$Result$map,
-							function (pointer) {
-								return A2(
-									$author$project$GMachine$pop,
-									1,
-									A3($author$project$GMachine$updatePointer, pointer, nodeOnTop, gmachine));
+						return A3(
+							$elm_community$result_extra$Result$Extra$unpack,
+							$author$project$GMachine$Crash,
+							function (addr) {
+								return $author$project$GMachine$Running(
+									A2(
+										$author$project$GMachine$pop,
+										1,
+										A3($author$project$GMachine$updatePointer, addr, nodeOnTop, gmachine)));
 							},
-							nodeToReplace);
+							A2($author$project$GMachine$getFromStack, stack, k));
 					} else {
-						break _v0$14;
+						break _v0$20;
 					}
 				case 'POP':
 					var k = _v0.a.a;
-					return $elm$core$Result$Ok(
+					return $author$project$GMachine$Running(
 						A2($author$project$GMachine$pop, k, gmachine));
 				case 'PUSHLOCAL':
 					var k = _v0.a.a;
-					var _v16 = A2($elm_community$list_extra$List$Extra$getAt, k, stack);
-					if (_v16.$ === 'Just') {
-						var node = _v16.a;
-						return $elm$core$Result$Ok(
-							A2($author$project$GMachine$push, node, gmachine));
-					} else {
-						return $elm$core$Result$Err($author$project$GMachine$EmptyStack);
-					}
+					return $author$project$GMachine$runtimeResult(
+						A2(
+							$elm$core$Result$map,
+							A2($elm_community$basics_extra$Basics$Extra$flip, $author$project$GMachine$push, gmachine),
+							A2($author$project$GMachine$getFromStack, stack, k)));
+				case 'PUSHINT':
+					var x = _v0.a.a;
+					return $author$project$GMachine$Running(
+						A2(
+							$author$project$GMachine$mkNodeAndPush,
+							$author$project$GMachine$GInt(x),
+							gmachine));
 				case 'PUSHARG':
 					var k = _v0.a.a;
-					var arg = A2(
-						$elm$core$Result$map,
-						$author$project$GMachine$getArg,
+					return $author$project$GMachine$runtimeResult(
 						A2(
-							$elm$core$Result$andThen,
-							$author$project$GMachine$retrieveNode(gmachine),
+							$elm$core$Result$map,
+							A2($elm_community$basics_extra$Basics$Extra$flip, $author$project$GMachine$push, gmachine),
 							A2(
-								$elm$core$Result$fromMaybe,
-								$author$project$GMachine$EmptyStack,
-								A2($elm_community$list_extra$List$Extra$getAt, k + 1, stack))));
-					if (arg.$ === 'Ok') {
-						if (arg.a.$ === 'Just') {
-							var argAddr = arg.a.a;
-							return $elm$core$Result$Ok(
-								A2($author$project$GMachine$push, argAddr, gmachine));
-						} else {
-							var _v18 = arg.a;
-							return $elm$core$Result$Err($author$project$GMachine$MissingArgument);
-						}
-					} else {
-						var err = arg.a;
-						return $elm$core$Result$Err(err);
-					}
+								$elm$core$Result$andThen,
+								$author$project$GMachine$getArg,
+								A2(
+									$elm$core$Result$andThen,
+									$author$project$GMachine$retrieveNode(gmachine),
+									A2($author$project$GMachine$getFromStack, stack, k)))));
 				case 'MKAP':
-					var _v19 = _v0.a;
-					if (stack.b && stack.b.b) {
-						var n1 = stack.a;
-						var _v21 = stack.b;
-						var n2 = _v21.a;
-						var stack_ = _v21.b;
-						return $elm$core$Result$Ok(
+					var _v12 = _v0.a;
+					return $author$project$GMachine$runtimeResult(
+						A3(
+							$elm$core$Result$map2,
+							F2(
+								function (n1, n2) {
+									return A2(
+										$author$project$GMachine$mkNodeAndPush,
+										A2($author$project$GMachine$GApp, n1, n2),
+										A2($author$project$GMachine$pop, 2, gmachine));
+								}),
+							A2($author$project$GMachine$getFromStack, stack, 0),
+							A2($author$project$GMachine$getFromStack, stack, 1)));
+				case 'ADD':
+					if ((((_v0.b.$ === 'Ok') && (_v0.b.a.$ === 'GInt')) && (_v0.c.$ === 'Ok')) && (_v0.c.a.$ === 'GInt')) {
+						var _v13 = _v0.a;
+						var x = _v0.b.a.a;
+						var y = _v0.c.a.a;
+						return $author$project$GMachine$Running(
 							A2(
 								$author$project$GMachine$mkNodeAndPush,
-								A2($author$project$GMachine$GApp, n1, n2),
-								A2($author$project$GMachine$setStack, stack_, gmachine)));
+								$author$project$GMachine$GInt(x + y),
+								A2($author$project$GMachine$pop, 2, gmachine)));
 					} else {
-						return $elm$core$Result$Err($author$project$GMachine$EmptyStack);
+						break _v0$20;
+					}
+				case 'SUB':
+					if ((((_v0.b.$ === 'Ok') && (_v0.b.a.$ === 'GInt')) && (_v0.c.$ === 'Ok')) && (_v0.c.a.$ === 'GInt')) {
+						var _v14 = _v0.a;
+						var x = _v0.b.a.a;
+						var y = _v0.c.a.a;
+						return $author$project$GMachine$Running(
+							A2(
+								$author$project$GMachine$mkNodeAndPush,
+								$author$project$GMachine$GInt(x - y),
+								A2($author$project$GMachine$pop, 2, gmachine)));
+					} else {
+						break _v0$20;
+					}
+				case 'MUL':
+					if ((((_v0.b.$ === 'Ok') && (_v0.b.a.$ === 'GInt')) && (_v0.c.$ === 'Ok')) && (_v0.c.a.$ === 'GInt')) {
+						var _v15 = _v0.a;
+						var x = _v0.b.a.a;
+						var y = _v0.c.a.a;
+						return $author$project$GMachine$Running(
+							A2(
+								$author$project$GMachine$mkNodeAndPush,
+								$author$project$GMachine$GInt(x * y),
+								A2(
+									$author$project$GMachine$setStack,
+									A2($elm$core$List$drop, 2, stack),
+									gmachine)));
+					} else {
+						break _v0$20;
+					}
+				case 'DIV':
+					if ((((_v0.b.$ === 'Ok') && (_v0.b.a.$ === 'GInt')) && (_v0.c.$ === 'Ok')) && (_v0.c.a.$ === 'GInt')) {
+						var _v16 = _v0.a;
+						var x = _v0.b.a.a;
+						var y = _v0.c.a.a;
+						return $author$project$GMachine$Running(
+							A2(
+								$author$project$GMachine$mkNodeAndPush,
+								$author$project$GMachine$GInt((x / y) | 0),
+								A2($author$project$GMachine$pop, 2, gmachine)));
+					} else {
+						break _v0$20;
+					}
+				case 'EQU':
+					if ((((_v0.b.$ === 'Ok') && (_v0.b.a.$ === 'GInt')) && (_v0.c.$ === 'Ok')) && (_v0.c.a.$ === 'GInt')) {
+						var _v17 = _v0.a;
+						var x = _v0.b.a.a;
+						var y = _v0.c.a.a;
+						return $author$project$GMachine$Running(
+							A2(
+								$author$project$GMachine$mkNodeAndPush,
+								$author$project$GMachine$GInt(
+									_Utils_eq(x, y) ? 1 : 0),
+								A2($author$project$GMachine$pop, 2, gmachine)));
+					} else {
+						break _v0$20;
 					}
 				default:
 					var k = _v0.a.a;
-					return $elm$core$Result$Ok(
+					return $author$project$GMachine$runtimeResult(
 						A2(
-							$author$project$GMachine$setStack,
-							_Utils_ap(
-								A2($elm$core$List$take, 1, stack),
-								A2($elm$core$List$drop, k + 1, stack)),
-							gmachine));
+							$elm$core$Result$map,
+							function (topVal) {
+								return A3(
+									$elm$core$Basics$composeR,
+									$author$project$GMachine$pop(k + 1),
+									$author$project$GMachine$push(topVal),
+									gmachine);
+							},
+							$author$project$GMachine$getTopVal(stack)));
 			}
 		}
-		var err = _v0.b.a;
-		return $elm$core$Result$Err(err);
+		var node = _v0.b;
+		return A3(
+			$elm_community$result_extra$Result$Extra$unpack,
+			$author$project$GMachine$Crash,
+			$author$project$GMachine$Crash,
+			A3(
+				$elm$core$Result$map2,
+				$author$project$GMachine$UnexpectedNode,
+				$author$project$GMachine$getTopVal(stack),
+				node));
 	});
 var $author$project$GMachine$step = function (machine) {
 	var _v0 = _Utils_Tuple3(machine.code, machine.stack, machine.unwinding);
@@ -18474,20 +19038,16 @@ var $author$project$GMachine$step = function (machine) {
 			var _v3 = _v0.a;
 			var nextInstruction = _v3.a;
 			var code = _v3.b;
-			return A3(
-				$elm_community$result_extra$Result$Extra$unpack,
-				$author$project$GMachine$Crash,
-				$author$project$GMachine$Running,
+			return A2(
+				$author$project$GMachine$stateTransition,
+				nextInstruction,
 				A2(
-					$author$project$GMachine$stateTransition,
-					nextInstruction,
+					$author$project$GMachine$setCode,
+					code,
 					A2(
-						$author$project$GMachine$setCode,
-						code,
-						A2(
-							$author$project$GMachine$setUnwinding,
-							_Utils_eq(nextInstruction, $author$project$Backend$UNWIND),
-							machine))));
+						$author$project$GMachine$setUnwinding,
+						_Utils_eq(nextInstruction, $author$project$Backend$UNWIND),
+						machine)));
 		}
 	} else {
 		if (_v0.b.b) {
@@ -20011,7 +20571,7 @@ var $author$project$Main$stepButton = A2(
 		onPress: $elm$core$Maybe$Just($author$project$Main$ClickedStep)
 	});
 var $elm$core$Debug$todo = _Debug_todo;
-var $author$project$Main$gCodeToString = function (instruction) {
+var $author$project$Backend$gCodeToString = function (instruction) {
 	switch (instruction.$) {
 		case 'ALLOC':
 			var n = instruction.a;
@@ -20035,11 +20595,24 @@ var $author$project$Main$gCodeToString = function (instruction) {
 		case 'PUSHARG':
 			var i = instruction.a;
 			return 'PUSHARG ' + $elm$core$String$fromInt(i);
+		case 'PUSHINT':
+			var i = instruction.a;
+			return 'PUSHINT ' + $elm$core$String$fromInt(i);
 		case 'MKAP':
 			return 'MKAP';
-		default:
+		case 'SLIDE':
 			var n = instruction.a;
 			return 'SLIDE ' + $elm$core$String$fromInt(n);
+		case 'ADD':
+			return 'ADD';
+		case 'SUB':
+			return 'SUB';
+		case 'MUL':
+			return 'MUL';
+		case 'DIV':
+			return 'DIV';
+		default:
+			return 'EQU';
 	}
 };
 var $author$project$Main$viewCode = function (code) {
@@ -20049,7 +20622,7 @@ var $author$project$Main$viewCode = function (code) {
 			[$author$project$Main$fillHeight, $author$project$Main$fillWidth]),
 		A2(
 			$elm$core$List$map,
-			A2($elm$core$Basics$composeR, $author$project$Main$gCodeToString, $mdgriffith$elm_ui$Element$text),
+			A2($elm$core$Basics$composeR, $author$project$Backend$gCodeToString, $mdgriffith$elm_ui$Element$text),
 			code));
 };
 var $goyalarchit$elm_dagre$Render$StandardDrawers$Types$Spline = {$: 'Spline'};
@@ -23925,8 +24498,11 @@ var $author$project$Main$nodeLabel = function (node) {
 			return name;
 		case 'GApp':
 			return '@';
+		case 'GHole':
+			return '■';
 		default:
-			return '';
+			var x = _v0.a;
+			return $elm$core$String$fromInt(x);
 	}
 };
 var $goyalarchit$elm_dagre$Render$StandardDrawers$Types$NoShape = {$: 'NoShape'};
@@ -27445,16 +28021,6 @@ var $goyalarchit$elm_dagre$Dagre$Order$sweepLayers = F2(
 			$elm$core$List$reverse(
 				A2($elm$core$List$range, 0, maxRank - 1)));
 	});
-var $elm_community$list_extra$List$Extra$uncons = function (list) {
-	if (!list.b) {
-		return $elm$core$Maybe$Nothing;
-	} else {
-		var first = list.a;
-		var rest = list.b;
-		return $elm$core$Maybe$Just(
-			_Utils_Tuple2(first, rest));
-	}
-};
 var $elm_community$list_extra$List$Extra$swapAt = F3(
 	function (index1, index2, l) {
 		swapAt:
@@ -27801,8 +28367,8 @@ var $author$project$Main$view = function (_v0) {
 						_Debug_todo(
 							'Main',
 							{
-								start: {line: 330, column: 66},
-								end: {line: 330, column: 76}
+								start: {line: 315, column: 66},
+								end: {line: 315, column: 76}
 							}))
 					]),
 				_List_fromArray(
@@ -27842,8 +28408,8 @@ var $author$project$Main$view = function (_v0) {
 						_Debug_todo(
 							'Main',
 							{
-								start: {line: 337, column: 95},
-								end: {line: 337, column: 105}
+								start: {line: 322, column: 95},
+								end: {line: 322, column: 105}
 							}))
 					]),
 				$author$project$Main$viewMachine(machine))

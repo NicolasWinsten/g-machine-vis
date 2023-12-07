@@ -7,6 +7,7 @@ import Parser exposing (DeadEnd)
 import Basics.Extra exposing (flip)
 import Result.Extra
 import String.Extra
+import Parser exposing (getChompedString, oneOf)
 
 {-
 this module parses source code to ASTs
@@ -25,6 +26,7 @@ type SCExpr
   | SCApp SCExpr SCExpr
   | SCLet Binding SCExpr
   | SCLetRec (List Binding) SCExpr
+  | SCInt Int
 
 
 type SuperCombinator = SC Name Formals SCExpr
@@ -80,17 +82,53 @@ group = succeed identity
   |= lazy (\_ -> expr)
   |. spaces
   |. symbol ")"
+
+intLit : Parser SCExpr
+intLit = Parser.number
+  { int = Just SCInt
+  , float = Nothing
+  , hex = Nothing
+  , octal = Nothing
+  , binary = Nothing
+  }
+
 term : Parser SCExpr
-term = Parser.oneOf [scident, group]
+term = Parser.oneOf [scident, intLit, group]
 
 {-| parse a series of expression applications of the form: e1 e2 e3 ...
 
 resulting in: ... SCApp (SCApp e1 e2) e3 ...
 -}
-expr : Parser SCExpr
-expr = some (term |. spaces)
+app : Parser SCExpr
+app = some (term |. spaces)
   |> Parser.map (\(t1, rest) -> List.foldl (flip SCApp) t1 rest)
 
+{-| parse multiplication or division expression
+-}
+arith1 : Parser SCExpr
+arith1 =
+  let operation = succeed (\left op right -> SCApp (SCApp (SCIdent op) left) right)
+        |= app
+        |. spaces
+        |= getChompedString (oneOf [symbol "*", symbol "/"])
+        |. spaces
+        |= app
+  in oneOf [Parser.backtrackable operation, app]
+
+{-| parse addition or subtraction expression
+-}
+arith : Parser SCExpr
+arith =
+  let operation = succeed (\left op right -> SCApp (SCApp (SCIdent op) left) right)
+        |= arith1
+        |. spaces
+        |= getChompedString (oneOf [symbol "+", symbol "-"])
+        |. spaces
+        |= arith1
+  in oneOf [Parser.backtrackable operation, arith1]
+
+expr : Parser SCExpr
+expr = arith
 
 type alias ParseFailure = List DeadEnd
 
