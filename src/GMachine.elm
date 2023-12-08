@@ -111,12 +111,10 @@ getCodePtr : GMachine -> CodePtr
 getCodePtr = codePtrLens.get
 
 type RuntimeError
-  = UnknownName String
+  = UndefinedSymbol String
   | NodeDoesNotExist HeapAddr
-  | EmptyStack
-  | OutOfBoundsStack
-  | MissingArgument
-  | UnexpectedNode HeapAddr GNode
+  | StackException Int
+  | UnexpectedNode HeapAddr
   | CannotSaveFrameWhileUnwinding
 
 {-| push a node reference to the stack
@@ -142,7 +140,7 @@ currentInstruction = getCodePtr >> ZipList.current
 -}
 saveFrame : GMachine -> Result RuntimeError GMachine
 saveFrame gmachine = case gmachine.ctx of
-  Unwinding _ -> Err CannotSaveFrameWhileUnwinding
+  Unwinding _ -> Err CannotSaveFrameWhileUnwinding -- this branch should never occur
   StackFrame frame -> Ok {gmachine | dump=frame::gmachine.dump}
 
 {-| save the current context and clear the stack except for the top value
@@ -199,7 +197,7 @@ mkNodeAndPush node gmachine =
 
 {-| retrieve the data given by an address -}
 retrieveNode : GMachine -> HeapAddr -> Result RuntimeError GNode
-retrieveNode gmachine node = Result.fromMaybe (NodeDoesNotExist node) (Dict.get node gmachine.graph)
+retrieveNode gmachine addr = Result.fromMaybe (NodeDoesNotExist addr) (Dict.get addr gmachine.graph)
 
 {-| replace a node in the graph
 -}
@@ -210,7 +208,7 @@ updatePointer id node gmachine = {gmachine | graph=Dict.insert id node gmachine.
 -}
 getFromStack : GMachine -> Int -> Result RuntimeError HeapAddr
 getFromStack gmachine offset =
-  Result.fromMaybe OutOfBoundsStack
+  Result.fromMaybe (StackException offset)
   <| List.Extra.getAt offset
   <| getStack gmachine
 
@@ -219,19 +217,13 @@ getFromStack gmachine offset =
 getTopVal : GMachine -> Result RuntimeError HeapAddr
 getTopVal stack = getFromStack stack 0
 
-{-| given an application node, return the argument (right hand side)
--}
-getArg : GNode -> Result RuntimeError HeapAddr
-getArg node = case node of
-  GApp _ arg -> Ok arg
-  _ -> Err MissingArgument
 
 {-| retrieve the global function from the environment given a name
 -}
 retrieveGlobal : String -> GMachine -> Result RuntimeError Global
 retrieveGlobal name {env, builtins} = name
   |> Maybe.Extra.oneOf [flip getGlobal env, flip getGlobal builtins]
-  |> Result.fromMaybe (UnknownName name)
+  |> Result.fromMaybe (UndefinedSymbol name)
 
 runtimeResult : Result RuntimeError GMachine -> RuntimeResult
 runtimeResult = Result.Extra.unpack Crash Running
@@ -285,9 +277,13 @@ stateTransition instruction gmachine =
       -- not enough arguments are on the stack,
       -- so we restore the saved context with the root of the current redex
       -- on the top of the stack
-      else case List.head <| List.reverse <| getStack gmachine of
-        Just redexRoot -> return redexRoot gmachine
-        Nothing -> Crash EmptyStack
+      else
+      let redexRootAddr = getFromStack gmachine
+            (List.length (getStack gmachine) - 1)
+      in Result.Extra.unpack
+        Crash
+        (\addr -> return addr gmachine)
+        redexRootAddr
 
     (UNWIND, Ok (GInt _), _) -> Result.Extra.unpack
         Crash (flip return gmachine)
@@ -317,9 +313,12 @@ stateTransition instruction gmachine =
     -- push a function argument onto the top of the stack
     -- by following the right child pointer of the application node at offset k
     (PUSHARG k, _, _) -> getFromStack gmachine k
-      |> Result.andThen (retrieveNode gmachine)
-      |> Result.andThen getArg
-      |> Result.map (flip push gmachine)
+      |> Result.andThen (\addr ->
+        case retrieveNode gmachine addr of
+          Ok (GApp _ arg) -> Ok (push arg gmachine)
+          Ok _ -> Err (UnexpectedNode addr)
+          Err err -> Err err
+      )
       |> runtimeResult
 
     -- push an application node combining the two elements on the top of the stack
@@ -366,9 +365,10 @@ stateTransition instruction gmachine =
       |> runtimeResult
 
     -- if we don't know what to do next, then fail returning the node on the top of the stack
-    (_, node, _) ->
-      Result.map2 UnexpectedNode (getTopVal gmachine) node
-      |> Result.Extra.unpack Crash Crash
+    (_, node, _) -> Result.Extra.unpack
+      Crash
+      (Crash << UnexpectedNode)
+      (getTopVal gmachine)
 
 
 setup : Env -> Global -> GMachine
