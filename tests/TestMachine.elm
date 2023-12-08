@@ -8,10 +8,18 @@ import GMachine exposing (..)
 import Dict
 import Dict.Extra
 import Debug
+import List.Nonempty as Nonempty
 
 type TestOutput
     = TFunc String
     | TInt Int
+
+global : String -> Int -> List GCode -> Global
+global name numFormals code = Global name numFormals
+    ( Maybe.withDefault
+        (Nonempty.singleton (PUSHGLOBAL "ERROR: SUPPLY INSTRUCTIONS IN TEST"))
+        (Nonempty.fromList code)
+    )
 
 expectOutput : TestOutput -> GMachine -> Expectation
 expectOutput expected machine = case runMachine machine of
@@ -59,8 +67,8 @@ main = f f
     [ SC "f" ["x"] (SCIdent "x")
     , SC "main" [] (SCApp (SCIdent "f") (SCIdent "f"))
     ]
-    [ Global "f" 1 [PUSHARG 1, UPDATE 2, POP 1, UNWIND]
-    , Global "main" 0 [PUSHGLOBAL "f", PUSHGLOBAL "f", MKAP, UPDATE 1, UNWIND]
+    [ global "f" 1 [PUSHARG 1, UPDATE 2, POP 1, UNWIND]
+    , global "main" 0 [PUSHGLOBAL "f", PUSHGLOBAL "f", MKAP, UPDATE 1, UNWIND]
     ]
     (TFunc "f")
 
@@ -85,10 +93,10 @@ main = (sub (always  ) always) (  identity sub  )
             (SCApp (SCIdent "identity") (SCIdent "sub"))
         )
     ]
-    [ Global "identity" 1 [PUSHARG 1, UPDATE 2, POP 1, UNWIND]
-    , Global "always" 2 [PUSHARG 1, UPDATE 3, POP 2, UNWIND]
-    , Global "sub" 3 [PUSHARG 3, PUSHARG 3, MKAP, PUSHARG 4, PUSHARG 3, MKAP, MKAP, UPDATE 4, POP 3, UNWIND]
-    , Global "main" 0
+    [ global "identity" 1 [PUSHARG 1, UPDATE 2, POP 1, UNWIND]
+    , global "always" 2 [PUSHARG 1, UPDATE 3, POP 2, UNWIND]
+    , global "sub" 3 [PUSHARG 3, PUSHARG 3, MKAP, PUSHARG 4, PUSHARG 3, MKAP, MKAP, UPDATE 4, POP 3, UNWIND]
+    , global "main" 0
         [ PUSHGLOBAL "sub", PUSHGLOBAL "identity", MKAP
         , PUSHGLOBAL "always", PUSHGLOBAL "always", PUSHGLOBAL "sub", MKAP, MKAP, MKAP
         , UPDATE 1, UNWIND

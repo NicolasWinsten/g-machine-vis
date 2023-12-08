@@ -1,13 +1,13 @@
 module GMachine exposing
   ( createMachine, step, runMachine
   , RuntimeResult(..), RuntimeError(..), GMachine
-  , GNode(..), GGraph, NodeId
+  , GNode(..), GGraph, HeapAddr
   , getChildren
+  , getStack, getCodePtr
   )
 
 import Basics.Extra exposing (flip)
-import Dict as Dict
-import Dict exposing (Dict)
+import Dict as Dict exposing (Dict)
 import Result exposing (Result(..))
 import Funcs as F
 import List.Extra
@@ -15,6 +15,10 @@ import Backend exposing (..)
 import Result.Extra
 import Set exposing (Set)
 import Maybe.Extra
+import ZipList exposing (ZipList)
+import Monocle.Lens as Lens exposing (Lens)
+import Shape exposing (stack)
+import List.Nonempty exposing (Nonempty(..))
 
 {-| this module implements the runtime behavior of the G-Machine
 
@@ -25,71 +29,160 @@ A great short tutorial on G-Machine implementation: https://amelia.how/posts/the
 A longer tutorial: Peyton Jones, S. L. (1987). The implementation of Functional Programming Languages. Prentice-Hall.
 -}
 
-type alias NodeId = Int
+type alias HeapAddr = Int
 
 {-| type of nodes that can exist in the graph
 -}
 type GNode
-  = GApp NodeId NodeId
+  = GApp HeapAddr HeapAddr
   | GFunc Global
   | GInt Int
   | GHole
 
-type alias GGraph = Dict NodeId GNode
 
-type alias GStack = List NodeId
+type alias GGraph = Dict HeapAddr GNode
 
-type alias GDump = List (GStack, List GCode)
+type alias GStack = List HeapAddr
+
+type alias CodePtr = ZipList GCode
+
+type alias Frame = { stack : GStack, codePtr : CodePtr, function : Global }
+
+type GContext
+  = StackFrame Frame
+  | Unwinding GStack
+
+type alias GDump = List Frame
 
 type alias GMachine =
-  { stack : GStack
+  { ctx : GContext
   , graph : GGraph
-  , code  : List GCode
   , dump  : GDump
   , builtins : Env
   , env   : Env
   , nodeCounter : Int -- used for uniquely identifying nodes
-  , unwinding : Bool
   }
+
+isUnwinding : GMachine -> Bool
+isUnwinding gmachine = case gmachine.ctx of
+  Unwinding _ -> True
+  _ -> False
+
+{-| access the stack from gmachine context
+-}
+accessStack : Lens GContext GStack
+accessStack = Lens
+  (\ctx -> case ctx of
+    StackFrame frame -> frame.stack
+    Unwinding stack -> stack
+  ) 
+  (\stack ctx -> case ctx of
+    StackFrame frame -> StackFrame {frame | stack=stack}
+    Unwinding _ -> Unwinding stack
+  )
+
+{-| access the codePtr from current stack frame
+or return constant UNWIND instruction if machine is unwinding
+-}
+accessCode : Lens GContext CodePtr
+accessCode = Lens
+  (\ctx -> case ctx of
+    StackFrame frame -> frame.codePtr
+    Unwinding _ -> ZipList.singleton UNWIND
+  )
+  (\codePtr ctx -> case ctx of
+    StackFrame frame -> StackFrame {frame | codePtr=codePtr}
+    Unwinding _ -> ctx
+  )
+
+accessCtx : Lens GMachine GContext
+accessCtx = Lens .ctx (\ctx machine -> {machine | ctx=ctx})
+
+codePtrLens : Lens GMachine CodePtr
+codePtrLens = Lens.compose accessCtx accessCode
+
+stackLens : Lens GMachine GStack
+stackLens = Lens.compose accessCtx accessStack
+
+getStack : GMachine -> GStack
+getStack = stackLens.get
+
+getCodePtr : GMachine -> CodePtr
+getCodePtr = codePtrLens.get
 
 type RuntimeError
   = UnknownName String
-  | NodeDoesNotExist NodeId
+  | NodeDoesNotExist HeapAddr
   | EmptyStack
   | OutOfBoundsStack
-  | EmptyDump
   | MissingArgument
-  | UnexpectedNode NodeId GNode
+  | UnexpectedNode HeapAddr GNode
+  | CannotSaveFrameWhileUnwinding
 
 {-| push a node reference to the stack
 -}
-push : NodeId -> GMachine -> GMachine
-push node gmachine = {gmachine | stack = node :: gmachine.stack}
+push : HeapAddr -> GMachine -> GMachine
+push node = Lens.modify stackLens ((::) node)
 
 {-| pop k items from the stack
 -}
 pop : Int -> GMachine -> GMachine
-pop num gmachine = {gmachine | stack=List.drop num gmachine.stack}
+pop num = Lens.modify stackLens (List.drop num)
 
-setStack : GStack -> GMachine -> GMachine
-setStack stack gmachine = {gmachine | stack=stack}
+popDump : GMachine -> GMachine
+popDump gmachine = {gmachine | dump=List.drop 1 gmachine.dump}
 
-setCode : List GCode -> GMachine -> GMachine
-setCode code gmachine = {gmachine | code=code}
+incCodePtr : GMachine -> GMachine
+incCodePtr = Lens.modify codePtrLens ZipList.forward 
 
-setDump : GDump -> GMachine -> GMachine
-setDump dump gmachine = {gmachine | dump=dump}
+currentInstruction : GMachine -> GCode
+currentInstruction = getCodePtr >> ZipList.current
 
-setEnv : Env -> GMachine -> GMachine
-setEnv env gmachine = {gmachine | env=env}
-
-setUnwinding : Bool -> GMachine -> GMachine
-setUnwinding flag gmachine = {gmachine | unwinding=flag}
-
-{-| save some state to the dump to be restored later
+{-| save the current context to the dump to be restored later
 -}
-pushContextToDump : GStack -> List GCode -> GMachine -> GMachine
-pushContextToDump stack code gmachine = {gmachine | dump= (stack, code) :: gmachine.dump}
+saveFrame : GMachine -> Result RuntimeError GMachine
+saveFrame gmachine = case gmachine.ctx of
+  Unwinding _ -> Err CannotSaveFrameWhileUnwinding
+  StackFrame frame -> Ok {gmachine | dump=frame::gmachine.dump}
+
+{-| save the current context and clear the stack except for the top value
+-}
+pushContext : GMachine -> Result RuntimeError GMachine
+pushContext gmachine = Result.map2 push (getTopVal gmachine) (gmachine |> pop 1 |> saveFrame)
+
+
+{-| restore the stack frame from the dump
+-}
+restore : GMachine -> Maybe GMachine
+restore gmachine = case gmachine.dump of
+  (frame :: _) -> gmachine
+    |> accessCtx.set (StackFrame frame)
+    |> popDump
+    |> Just
+  [] -> Nothing
+
+{-| return to the previous context saved on the dump
+with some value pushed to the top of the stack
+-}
+return : HeapAddr -> GMachine -> RuntimeResult
+return retVal gmachine = restore gmachine
+  |> Maybe.map (push retVal >> Running)
+  |> Maybe.withDefault (Terminated retVal gmachine.graph)
+
+{-| start process of unwinding gmachine
+-}
+startUnwind : GMachine -> GMachine
+startUnwind = Lens.modify accessCtx (accessStack.get >> Unwinding)
+
+{-| jump to the supercombinator's code
+-}
+enter : Global -> GMachine -> GMachine
+enter global gmachine = case global.code of
+  Nonempty first rest ->
+    accessCtx.set
+    (StackFrame {stack=getStack gmachine, codePtr=ZipList.new first rest, function=global})
+    gmachine
+
 
 incNodeCounter : GMachine -> GMachine
 incNodeCounter gmachine = {gmachine | nodeCounter=gmachine.nodeCounter + 1}
@@ -105,28 +198,30 @@ mkNodeAndPush node gmachine =
     |> push nodeId
 
 {-| retrieve the data given by an address -}
-retrieveNode : GMachine -> NodeId -> Result RuntimeError GNode
+retrieveNode : GMachine -> HeapAddr -> Result RuntimeError GNode
 retrieveNode gmachine node = Result.fromMaybe (NodeDoesNotExist node) (Dict.get node gmachine.graph)
 
 {-| replace a node in the graph
 -}
-updatePointer : NodeId -> GNode -> GMachine -> GMachine
+updatePointer : HeapAddr -> GNode -> GMachine -> GMachine
 updatePointer id node gmachine = {gmachine | graph=Dict.insert id node gmachine.graph}
 
 {-| retrieve the value from the stack at some offset from the top
 -}
-getFromStack : GStack -> Int -> Result RuntimeError NodeId
-getFromStack stack offset = Result.fromMaybe OutOfBoundsStack
-  <| List.Extra.getAt offset stack
+getFromStack : GMachine -> Int -> Result RuntimeError HeapAddr
+getFromStack gmachine offset =
+  Result.fromMaybe OutOfBoundsStack
+  <| List.Extra.getAt offset
+  <| getStack gmachine
 
 {-| retrieve the value at the top of the stack
 -}
-getTopVal : GStack -> Result RuntimeError NodeId
+getTopVal : GMachine -> Result RuntimeError HeapAddr
 getTopVal stack = getFromStack stack 0
 
 {-| given an application node, return the argument (right hand side)
 -}
-getArg : GNode -> Result RuntimeError NodeId
+getArg : GNode -> Result RuntimeError HeapAddr
 getArg node = case node of
   GApp _ arg -> Ok arg
   _ -> Err MissingArgument
@@ -138,21 +233,6 @@ retrieveGlobal name {env, builtins} = name
   |> Maybe.Extra.oneOf [flip getGlobal env, flip getGlobal builtins]
   |> Result.fromMaybe (UnknownName name)
 
-{-| return to the previous context saved on the dump
-with some value pushed to the top of the stack
--}
-return : NodeId -> GMachine -> Result RuntimeError GMachine
-return retVal gmachine =
-  let ((oldStack, oldCode), dump) =
-        Maybe.withDefault (([],[]), [])
-        (List.Extra.uncons gmachine.dump)
-  in gmachine
-    |> setStack oldStack
-    |> setCode oldCode
-    |> setDump dump
-    |> push retVal
-    |> Ok
-
 runtimeResult : Result RuntimeError GMachine -> RuntimeResult
 runtimeResult = Result.Extra.unpack Crash Running
 
@@ -160,9 +240,10 @@ runtimeResult = Result.Extra.unpack Crash Running
 {-| given the next GCode instruction, perform the state transition for the G-Machine
 -}
 stateTransition : GCode -> GMachine -> RuntimeResult
-stateTransition instruction ({stack, code, dump} as gmachine) =
-  let topMostNode = Result.andThen (retrieveNode gmachine) (getTopVal stack)
-      sndTopMostNode = Result.andThen (retrieveNode gmachine) (getFromStack stack 1)
+stateTransition instruction gmachine =
+  let topMostNode = Result.andThen (retrieveNode gmachine) (getTopVal gmachine)
+      sndTopMostNode = Result.andThen (retrieveNode gmachine) (getFromStack gmachine 1)
+
   in case (instruction, topMostNode, sndTopMostNode) of
     -- create the node for the supercombinator and push it to the stack
     (PUSHGLOBAL name, _, _) -> retrieveGlobal name gmachine
@@ -174,54 +255,43 @@ stateTransition instruction ({stack, code, dump} as gmachine) =
 
     -- evaluate according to the node on the top of the stack
     (EVAL, Ok (GApp _ _), _) -> gmachine
-      |> setStack (List.take 1 stack)
-      |> setCode [UNWIND]
-      |> pushContextToDump (List.drop 1 stack) code
-      |> Running
+      |> pushContext
+      |> Result.map startUnwind
+      |> runtimeResult
     
     -- only perform the eval if the node is CAF (constant, no params)
     (EVAL, Ok (GFunc global), _) ->
       if global.numFormals == 0
       then gmachine
-        |> setStack (List.take 1 stack)
-        |> setCode global.code
-        |> pushContextToDump (List.drop 1 stack) code
-        |> Running
+        |> pushContext
+        |> Result.map (enter global)
+        |> runtimeResult
       else Running gmachine
 
     (EVAL, Ok (GInt _), _) -> Running gmachine
 
     -- travel down the spine of the graph to figure out what to do next
-    (UNWIND, Ok (GApp n1 n2), _) -> gmachine
-      |> push n1
-      |> setCode [UNWIND]
-      |> Running
+    (UNWIND, Ok (GApp n1 n2), _) -> Running (push n1 gmachine)
 
     (UNWIND, Ok (GFunc global), _) ->
-      let enoughArguments = List.length stack > global.numFormals
+      let stackLength = List.length (getStack gmachine)
+          enoughArguments = stackLength > global.numFormals
       in
       if enoughArguments
       -- given that enough arguments are present on the stack,
       -- jump to the global function's code for evaluation
-      then Running (setCode global.code gmachine)
+      then Running (enter global gmachine)
 
       -- not enough arguments are on the stack,
       -- so we restore the saved context with the root of the current redex
       -- on the top of the stack
-      else case List.head (List.reverse stack) of
-        Just redexRoot ->
-          case dump of
-            (oldStack, oldCode) :: dump_ -> gmachine
-              |> setStack (redexRoot :: oldStack)
-              |> setCode oldCode
-              |> setDump dump_
-              |> Running
-            [] -> Terminated redexRoot gmachine.graph
+      else case List.head <| List.reverse <| getStack gmachine of
+        Just redexRoot -> return redexRoot gmachine
         Nothing -> Crash EmptyStack
 
-    (UNWIND, Ok (GInt _), _) -> getTopVal stack
-      |> Result.andThen (flip return gmachine)
-      |> runtimeResult
+    (UNWIND, Ok (GInt _), _) -> Result.Extra.unpack
+        Crash (flip return gmachine)
+        (getTopVal gmachine)
 
     -- replace the node referenced by the given offset in the stack
     -- with a copy of the node on the top of the stack
@@ -233,12 +303,12 @@ stateTransition instruction ({stack, code, dump} as gmachine) =
         |> pop 1
         |> Running
       )
-      (getFromStack stack k)
+      (getFromStack gmachine k)
 
     (POP k, _, _) -> Running <| pop k gmachine 
 
     -- push a local value that is referenced at offset k in the stack
-    (PUSHLOCAL k, _, _) -> getFromStack stack k
+    (PUSHLOCAL k, _, _) -> getFromStack gmachine k
       |> Result.map (flip push gmachine)
       |> runtimeResult
 
@@ -246,7 +316,7 @@ stateTransition instruction ({stack, code, dump} as gmachine) =
     
     -- push a function argument onto the top of the stack
     -- by following the right child pointer of the application node at offset k
-    (PUSHARG k, _, _) -> getFromStack stack k
+    (PUSHARG k, _, _) -> getFromStack gmachine k
       |> Result.andThen (retrieveNode gmachine)
       |> Result.andThen getArg
       |> Result.map (flip push gmachine)
@@ -259,8 +329,8 @@ stateTransition instruction ({stack, code, dump} as gmachine) =
         |> pop 2
         |> mkNodeAndPush (GApp n1 n2)
       )
-      (getFromStack stack 0)
-      (getFromStack stack 1)
+      (getFromStack gmachine 0)
+      (getFromStack gmachine 1)
     
     -- perform a math operation on the operands located in the top 2 stack cells
     (ADD, Ok (GInt x), Ok (GInt y)) -> gmachine
@@ -274,7 +344,7 @@ stateTransition instruction ({stack, code, dump} as gmachine) =
         |> Running
 
     (MUL, Ok (GInt x), Ok (GInt y)) -> gmachine
-        |> setStack (List.drop 2 stack)
+        |> pop 2
         |> mkNodeAndPush (GInt (x * y))
         |> Running
     
@@ -291,27 +361,27 @@ stateTransition instruction ({stack, code, dump} as gmachine) =
     -- pop and save the value on the top of the stack
     -- pop k more elements
     -- restore the saved value to the top of the stack
-    (SLIDE k, _, _) -> getTopVal stack
+    (SLIDE k, _, _) -> getTopVal gmachine
       |> Result.map (\topVal -> gmachine |> pop (k + 1) >> push topVal)
       |> runtimeResult
 
     -- if we don't know what to do next, then fail returning the node on the top of the stack
     (_, node, _) ->
-      Result.map2 UnexpectedNode (getTopVal stack) node
+      Result.map2 UnexpectedNode (getTopVal gmachine) node
       |> Result.Extra.unpack Crash Crash
 
 
-emptyMachine : GMachine
-emptyMachine =
-  { stack=[]
-  , code=[]
+setup : Env -> Global -> GMachine
+setup env mainFunction =
+  { ctx=Unwinding []
   , dump=[]
   , graph=Dict.empty
   , builtins=stdLib
-  , env=emptyEnv
+  , env=env
   , nodeCounter=0
-  , unwinding=False
   }
+  |> mkNodeAndPush (GFunc mainFunction)
+  |> enter mainFunction
 
 
 {-| compile source code and set up the G-Machine
@@ -323,24 +393,20 @@ createMachine source = compile source
     Just mainFunction ->
       if mainFunction.numFormals /= 0
       then Err MainFunctionCannotHaveFormals
-      else emptyMachine
-        |> setEnv env
-        |> mkNodeAndPush (GFunc mainFunction)
-        |> setCode mainFunction.code
-        |> Ok
+      else Ok (setup env mainFunction)
     Nothing -> Err CannotFindMainFunction
   )
 
 {-| retrieve the children from the node
 -}
-getChildren : GNode -> Maybe (NodeId, NodeId)
+getChildren : GNode -> Maybe (HeapAddr, HeapAddr)
 getChildren node = case node of
   GApp left right -> Just (left, right)
   _ -> Nothing
 
 {-| perform full search from starting node, returning all reachable nodes
 -}
-reachableNodes : NodeId -> GGraph -> Set NodeId -> Set NodeId
+reachableNodes : HeapAddr -> GGraph -> Set HeapAddr -> Set HeapAddr
 reachableNodes root graph visited =
   if Set.member root visited then visited
   else
@@ -354,8 +420,9 @@ reachableNodes root graph visited =
 starting with the stack pointers (as well as in the dump) 
 -}
 garbageCollection : GMachine -> GMachine
-garbageCollection ({stack, dump, graph} as gmachine) =
-  let stackPointers = List.concat (stack :: List.map Tuple.first dump)
+garbageCollection ({dump, graph} as gmachine) =
+  let stackPointers = List.concat
+        (getStack gmachine :: List.map .stack dump)
       reachableCells = List.foldl
         (\ref visited -> reachableNodes ref graph visited)
         Set.empty
@@ -369,7 +436,7 @@ garbageCollection ({stack, dump, graph} as gmachine) =
 
 type RuntimeResult
   = Running GMachine
-  | Terminated NodeId GGraph 
+  | Terminated HeapAddr GGraph 
   | Crash RuntimeError
 
 
@@ -377,29 +444,18 @@ type RuntimeResult
 {-| perform the next state transition of the g-machine
 -}
 step : GMachine -> RuntimeResult
-step machine = case (machine.code, machine.stack, machine.unwinding) of
-  -- hitting an unwind instruction should trigger garbage collection
-  -- (unwinding will constitute multiple state transitions, so we keep track of whether this is the first unwind step)
-  (UNWIND :: _, _, False) -> machine
-    |> garbageCollection
-    |> setUnwinding True
-    |> Running
-
-  -- otherwise read the current instruction and apply the state transition
-  (nextInstruction :: code, _, _) -> machine
-    |> setUnwinding (nextInstruction == UNWIND)
-    |> setCode code
-    |> stateTransition nextInstruction
-  
-  -- no more instructions means the result is at the top of the stack
-  ([], result :: _, _) -> Terminated result machine.graph
-
-  -- crash if there is no result
-  (_, [], _) -> Crash EmptyStack
+step machine =
+  if isUnwinding machine
+  then stateTransition UNWIND machine
+  else case currentInstruction machine of
+    UNWIND -> (startUnwind >> step) machine
+    instruction -> machine
+      |> incCodePtr
+      |> stateTransition instruction
 
 {-| run the machine to completion
 -}
-runMachine : GMachine -> Result RuntimeError (NodeId, GGraph)
+runMachine : GMachine -> Result RuntimeError (HeapAddr, GGraph)
 runMachine machine =
   let run state = case state of
         Terminated node graph -> Ok (node, graph)

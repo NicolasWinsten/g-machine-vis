@@ -10800,9 +10800,6 @@ var $author$project$Main$StaticView = function (a) {
 	return {$: 'StaticView', a: a};
 };
 var $author$project$Backend$CannotFindMainFunction = {$: 'CannotFindMainFunction'};
-var $author$project$GMachine$GFunc = function (a) {
-	return {$: 'GFunc', a: a};
-};
 var $author$project$Backend$MainFunctionCannotHaveFormals = {$: 'MainFunctionCannotHaveFormals'};
 var $elm$core$Result$andThen = F2(
 	function (callback, result) {
@@ -10817,6 +10814,10 @@ var $elm$core$Result$andThen = F2(
 var $author$project$Backend$ParseFailure = function (a) {
 	return {$: 'ParseFailure', a: a};
 };
+var $mgold$elm_nonempty_list$List$Nonempty$Nonempty = F2(
+	function (a, b) {
+		return {$: 'Nonempty', a: a, b: b};
+	});
 var $author$project$Backend$POP = function (a) {
 	return {$: 'POP', a: a};
 };
@@ -10824,6 +10825,19 @@ var $author$project$Backend$UNWIND = {$: 'UNWIND'};
 var $author$project$Backend$UPDATE = function (a) {
 	return {$: 'UPDATE', a: a};
 };
+var $mgold$elm_nonempty_list$List$Nonempty$append = F2(
+	function (_v0, _v1) {
+		var x = _v0.a;
+		var xs = _v0.b;
+		var y = _v1.a;
+		var ys = _v1.b;
+		return A2(
+			$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
+			x,
+			_Utils_ap(
+				xs,
+				A2($elm$core$List$cons, y, ys)));
+	});
 var $author$project$Backend$ALLOC = function (a) {
 	return {$: 'ALLOC', a: a};
 };
@@ -10861,10 +10875,38 @@ var $author$project$Backend$augmentMapping = F3(
 					}),
 				bindings));
 	});
+var $mgold$elm_nonempty_list$List$Nonempty$head = function (_v0) {
+	var x = _v0.a;
+	var xs = _v0.b;
+	return x;
+};
+var $mgold$elm_nonempty_list$List$Nonempty$tail = function (_v0) {
+	var x = _v0.a;
+	var xs = _v0.b;
+	return xs;
+};
+var $mgold$elm_nonempty_list$List$Nonempty$toList = function (_v0) {
+	var x = _v0.a;
+	var xs = _v0.b;
+	return A2($elm$core$List$cons, x, xs);
+};
+var $mgold$elm_nonempty_list$List$Nonempty$concat = function (_v0) {
+	var xs = _v0.a;
+	var xss = _v0.b;
+	var tl = _Utils_ap(
+		$mgold$elm_nonempty_list$List$Nonempty$tail(xs),
+		$elm$core$List$concat(
+			A2($elm$core$List$map, $mgold$elm_nonempty_list$List$Nonempty$toList, xss)));
+	var hd = $mgold$elm_nonempty_list$List$Nonempty$head(xs);
+	return A2($mgold$elm_nonempty_list$List$Nonempty$Nonempty, hd, tl);
+};
 var $author$project$Backend$getStackPos = F2(
 	function (name, mapping) {
 		return A2($elm$core$Dict$get, name, mapping);
 	});
+var $mgold$elm_nonempty_list$List$Nonempty$singleton = function (x) {
+	return A2($mgold$elm_nonempty_list$List$Nonempty$Nonempty, x, _List_Nil);
+};
 var $author$project$Backend$compileInstantiation = F4(
 	function (e, numFormals, mapping, context) {
 		switch (e.$) {
@@ -10873,74 +10915,72 @@ var $author$project$Backend$compileInstantiation = F4(
 				var _v2 = A2($author$project$Backend$getStackPos, name, mapping);
 				if (_v2.$ === 'Just') {
 					var offset = _v2.a;
-					return _List_fromArray(
-						[
-							$author$project$Backend$PUSHARG((context - offset) + 1)
-						]);
+					return $mgold$elm_nonempty_list$List$Nonempty$singleton(
+						$author$project$Backend$PUSHARG((context - offset) + 1));
 				} else {
-					return _List_fromArray(
-						[
-							$author$project$Backend$PUSHGLOBAL(name)
-						]);
+					return $mgold$elm_nonempty_list$List$Nonempty$singleton(
+						$author$project$Backend$PUSHGLOBAL(name));
 				}
 			case 'SCInt':
 				var x = e.a;
-				return _List_fromArray(
-					[
-						$author$project$Backend$PUSHINT(x)
-					]);
+				return $mgold$elm_nonempty_list$List$Nonempty$singleton(
+					$author$project$Backend$PUSHINT(x));
 			case 'SCApp':
 				var e1 = e.a;
 				var e2 = e.b;
-				return _Utils_ap(
-					A4($author$project$Backend$compileInstantiation, e2, numFormals, mapping, context),
-					_Utils_ap(
-						A4($author$project$Backend$compileInstantiation, e1, numFormals, mapping, context + 1),
+				return $mgold$elm_nonempty_list$List$Nonempty$concat(
+					A2(
+						$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
+						A4($author$project$Backend$compileInstantiation, e2, numFormals, mapping, context),
 						_List_fromArray(
-							[$author$project$Backend$MKAP])));
+							[
+								A4($author$project$Backend$compileInstantiation, e1, numFormals, mapping, context + 1),
+								$mgold$elm_nonempty_list$List$Nonempty$singleton($author$project$Backend$MKAP)
+							])));
 			case 'SCLet':
 				var _v3 = e.a;
 				var name = _v3.a;
 				var def_ = _v3.b;
 				var body = e.b;
-				return _Utils_ap(
-					A4($author$project$Backend$compileInstantiation, def_, numFormals, mapping, context),
-					_Utils_ap(
-						A4(
-							$author$project$Backend$compileInstantiation,
-							body,
-							numFormals,
-							A3($elm$core$Dict$insert, name, context + 1, mapping),
-							context + 1),
+				return $mgold$elm_nonempty_list$List$Nonempty$concat(
+					A2(
+						$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
+						A4($author$project$Backend$compileInstantiation, def_, numFormals, mapping, context),
 						_List_fromArray(
 							[
-								$author$project$Backend$SLIDE(1)
+								A4(
+								$author$project$Backend$compileInstantiation,
+								body,
+								numFormals,
+								A3($elm$core$Dict$insert, name, context + 1, mapping),
+								context + 1),
+								$mgold$elm_nonempty_list$List$Nonempty$singleton(
+								$author$project$Backend$SLIDE(1))
 							])));
 			default:
 				var bindings = e.a;
 				var body = e.b;
 				var mapping_ = A3($author$project$Backend$augmentMapping, bindings, mapping, context);
 				var context_ = context + $elm$core$List$length(bindings);
-				return _Utils_ap(
-					A4($author$project$Backend$compileLetRecBindings, bindings, numFormals, mapping_, context_),
-					_Utils_ap(
-						A4($author$project$Backend$compileInstantiation, body, numFormals, mapping_, context_),
+				return $mgold$elm_nonempty_list$List$Nonempty$concat(
+					A2(
+						$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
+						A4($author$project$Backend$compileLetRecBindings, bindings, numFormals, mapping_, context_),
 						_List_fromArray(
 							[
-								$author$project$Backend$SLIDE(context_ - context)
+								A4($author$project$Backend$compileInstantiation, body, numFormals, mapping_, context_),
+								$mgold$elm_nonempty_list$List$Nonempty$singleton(
+								$author$project$Backend$SLIDE(context_ - context))
 							])));
 		}
 	});
 var $author$project$Backend$compileLetRecBindings = F4(
 	function (bindings, numFormals, mapping, context) {
 		var numBindings = $elm$core$List$length(bindings);
-		return $elm$core$List$concat(
-			A2(
-				$elm$core$List$cons,
-				_List_fromArray(
-					[
-						$author$project$Backend$ALLOC(numBindings)
-					]),
+		return A2(
+			$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
+			$author$project$Backend$ALLOC(numBindings),
+			$elm$core$List$concat(
 				A2(
 					$elm$core$List$indexedMap,
 					F2(
@@ -10948,7 +10988,8 @@ var $author$project$Backend$compileLetRecBindings = F4(
 							var name = _v0.a;
 							var e = _v0.b;
 							return _Utils_ap(
-								A4($author$project$Backend$compileInstantiation, e, numFormals, mapping, context),
+								$mgold$elm_nonempty_list$List$Nonempty$toList(
+									A4($author$project$Backend$compileInstantiation, e, numFormals, mapping, context)),
 								_List_fromArray(
 									[
 										$author$project$Backend$UPDATE(numBindings - i)
@@ -10958,13 +10999,12 @@ var $author$project$Backend$compileLetRecBindings = F4(
 	});
 var $author$project$Backend$compileBody = F3(
 	function (body, stackPos, context) {
-		return _Utils_ap(
+		return A2(
+			$mgold$elm_nonempty_list$List$Nonempty$append,
 			A4($author$project$Backend$compileInstantiation, body, context, stackPos, context),
-			_Utils_ap(
-				_List_fromArray(
-					[
-						$author$project$Backend$UPDATE(context + 1)
-					]),
+			A2(
+				$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
+				$author$project$Backend$UPDATE(context + 1),
 				_Utils_ap(
 					(!context) ? _List_Nil : _List_fromArray(
 						[
@@ -12465,6 +12505,134 @@ var $author$project$Backend$compile = A2(
 		$elm$core$Basics$composeR,
 		$elm$core$Result$mapError($author$project$Backend$ParseFailure),
 		$elm$core$Result$andThen($author$project$Backend$compileASTs)));
+var $author$project$GMachine$GFunc = function (a) {
+	return {$: 'GFunc', a: a};
+};
+var $author$project$GMachine$Unwinding = function (a) {
+	return {$: 'Unwinding', a: a};
+};
+var $author$project$GMachine$StackFrame = function (a) {
+	return {$: 'StackFrame', a: a};
+};
+var $arturopala$elm_monocle$Monocle$Lens$Lens = F2(
+	function (get, set) {
+		return {get: get, set: set};
+	});
+var $author$project$GMachine$accessCtx = A2(
+	$arturopala$elm_monocle$Monocle$Lens$Lens,
+	function ($) {
+		return $.ctx;
+	},
+	F2(
+		function (ctx, machine) {
+			return _Utils_update(
+				machine,
+				{ctx: ctx});
+		}));
+var $author$project$GMachine$accessStack = A2(
+	$arturopala$elm_monocle$Monocle$Lens$Lens,
+	function (ctx) {
+		if (ctx.$ === 'StackFrame') {
+			var frame = ctx.a;
+			return frame.stack;
+		} else {
+			var stack = ctx.a;
+			return stack;
+		}
+	},
+	F2(
+		function (stack, ctx) {
+			if (ctx.$ === 'StackFrame') {
+				var frame = ctx.a;
+				return $author$project$GMachine$StackFrame(
+					_Utils_update(
+						frame,
+						{stack: stack}));
+			} else {
+				return $author$project$GMachine$Unwinding(stack);
+			}
+		}));
+var $arturopala$elm_monocle$Monocle$Lens$compose = F2(
+	function (outer, inner) {
+		var set = F2(
+			function (c, a) {
+				return function (b) {
+					return A2(outer.set, b, a);
+				}(
+					A2(
+						inner.set,
+						c,
+						outer.get(a)));
+			});
+		return A2(
+			$arturopala$elm_monocle$Monocle$Lens$Lens,
+			A2($elm$core$Basics$composeR, outer.get, inner.get),
+			set);
+	});
+var $author$project$GMachine$stackLens = A2($arturopala$elm_monocle$Monocle$Lens$compose, $author$project$GMachine$accessCtx, $author$project$GMachine$accessStack);
+var $author$project$GMachine$getStack = $author$project$GMachine$stackLens.get;
+var $staeter$ziplist$ZipList$Zipper = F3(
+	function (a, b, c) {
+		return {$: 'Zipper', a: a, b: b, c: c};
+	});
+var $staeter$ziplist$ZipList$new = F2(
+	function (elem, list) {
+		return A3($staeter$ziplist$ZipList$Zipper, _List_Nil, elem, list);
+	});
+var $author$project$GMachine$enter = F2(
+	function (global, gmachine) {
+		var _v0 = global.code;
+		var first = _v0.a;
+		var rest = _v0.b;
+		return A2(
+			$author$project$GMachine$accessCtx.set,
+			$author$project$GMachine$StackFrame(
+				{
+					codePtr: A2($staeter$ziplist$ZipList$new, first, rest),
+					_function: global,
+					stack: $author$project$GMachine$getStack(gmachine)
+				}),
+			gmachine);
+	});
+var $author$project$GMachine$incNodeCounter = function (gmachine) {
+	return _Utils_update(
+		gmachine,
+		{nodeCounter: gmachine.nodeCounter + 1});
+};
+var $arturopala$elm_monocle$Monocle$Lens$modify = F2(
+	function (lens, f) {
+		var mf = function (a) {
+			return function (b) {
+				return A2(lens.set, b, a);
+			}(
+				f(
+					lens.get(a)));
+		};
+		return mf;
+	});
+var $author$project$GMachine$push = function (node) {
+	return A2(
+		$arturopala$elm_monocle$Monocle$Lens$modify,
+		$author$project$GMachine$stackLens,
+		$elm$core$List$cons(node));
+};
+var $author$project$GMachine$updatePointer = F3(
+	function (id, node, gmachine) {
+		return _Utils_update(
+			gmachine,
+			{
+				graph: A3($elm$core$Dict$insert, id, node, gmachine.graph)
+			});
+	});
+var $author$project$GMachine$mkNodeAndPush = F2(
+	function (node, gmachine) {
+		var nodeId = gmachine.nodeCounter;
+		return A2(
+			$author$project$GMachine$push,
+			nodeId,
+			$author$project$GMachine$incNodeCounter(
+				A3($author$project$GMachine$updatePointer, nodeId, node, gmachine)));
+	});
 var $author$project$Backend$ADD = {$: 'ADD'};
 var $author$project$Backend$DIV = {$: 'DIV'};
 var $author$project$Backend$EQU = {$: 'EQU'};
@@ -12487,120 +12655,104 @@ var $author$project$Backend$stdLib = A3(
 			$author$project$Backend$Global,
 			'+',
 			2,
-			_List_fromArray(
-				[
-					$author$project$Backend$PUSHARG(2),
-					$author$project$Backend$EVAL,
-					$author$project$Backend$PUSHARG(2),
-					$author$project$Backend$EVAL,
-					$author$project$Backend$ADD,
-					$author$project$Backend$UPDATE(3),
-					$author$project$Backend$POP(2),
-					$author$project$Backend$UNWIND
-				])),
+			A2(
+				$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
+				$author$project$Backend$PUSHARG(2),
+				_List_fromArray(
+					[
+						$author$project$Backend$EVAL,
+						$author$project$Backend$PUSHARG(2),
+						$author$project$Backend$EVAL,
+						$author$project$Backend$ADD,
+						$author$project$Backend$UPDATE(3),
+						$author$project$Backend$POP(2),
+						$author$project$Backend$UNWIND
+					]))),
 			A3(
 			$author$project$Backend$Global,
 			'-',
 			2,
-			_List_fromArray(
-				[
-					$author$project$Backend$PUSHARG(2),
-					$author$project$Backend$EVAL,
-					$author$project$Backend$PUSHARG(2),
-					$author$project$Backend$EVAL,
-					$author$project$Backend$SUB,
-					$author$project$Backend$UPDATE(3),
-					$author$project$Backend$POP(2),
-					$author$project$Backend$UNWIND
-				])),
+			A2(
+				$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
+				$author$project$Backend$PUSHARG(2),
+				_List_fromArray(
+					[
+						$author$project$Backend$EVAL,
+						$author$project$Backend$PUSHARG(2),
+						$author$project$Backend$EVAL,
+						$author$project$Backend$SUB,
+						$author$project$Backend$UPDATE(3),
+						$author$project$Backend$POP(2),
+						$author$project$Backend$UNWIND
+					]))),
 			A3(
 			$author$project$Backend$Global,
 			'*',
 			2,
-			_List_fromArray(
-				[
-					$author$project$Backend$PUSHARG(2),
-					$author$project$Backend$EVAL,
-					$author$project$Backend$PUSHARG(2),
-					$author$project$Backend$EVAL,
-					$author$project$Backend$MUL,
-					$author$project$Backend$UPDATE(3),
-					$author$project$Backend$POP(2),
-					$author$project$Backend$UNWIND
-				])),
+			A2(
+				$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
+				$author$project$Backend$PUSHARG(2),
+				_List_fromArray(
+					[
+						$author$project$Backend$EVAL,
+						$author$project$Backend$PUSHARG(2),
+						$author$project$Backend$EVAL,
+						$author$project$Backend$MUL,
+						$author$project$Backend$UPDATE(3),
+						$author$project$Backend$POP(2),
+						$author$project$Backend$UNWIND
+					]))),
 			A3(
 			$author$project$Backend$Global,
 			'/',
 			2,
-			_List_fromArray(
-				[
-					$author$project$Backend$PUSHARG(2),
-					$author$project$Backend$EVAL,
-					$author$project$Backend$PUSHARG(2),
-					$author$project$Backend$EVAL,
-					$author$project$Backend$DIV,
-					$author$project$Backend$UPDATE(3),
-					$author$project$Backend$POP(2),
-					$author$project$Backend$UNWIND
-				])),
+			A2(
+				$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
+				$author$project$Backend$PUSHARG(2),
+				_List_fromArray(
+					[
+						$author$project$Backend$EVAL,
+						$author$project$Backend$PUSHARG(2),
+						$author$project$Backend$EVAL,
+						$author$project$Backend$DIV,
+						$author$project$Backend$UPDATE(3),
+						$author$project$Backend$POP(2),
+						$author$project$Backend$UNWIND
+					]))),
 			A3(
 			$author$project$Backend$Global,
 			'==',
 			2,
-			_List_fromArray(
-				[
-					$author$project$Backend$PUSHARG(2),
-					$author$project$Backend$EVAL,
-					$author$project$Backend$PUSHARG(2),
-					$author$project$Backend$EVAL,
-					$author$project$Backend$EQU,
-					$author$project$Backend$UPDATE(3),
-					$author$project$Backend$POP(2),
-					$author$project$Backend$UNWIND
-				]))
+			A2(
+				$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
+				$author$project$Backend$PUSHARG(2),
+				_List_fromArray(
+					[
+						$author$project$Backend$EVAL,
+						$author$project$Backend$PUSHARG(2),
+						$author$project$Backend$EVAL,
+						$author$project$Backend$EQU,
+						$author$project$Backend$UPDATE(3),
+						$author$project$Backend$POP(2),
+						$author$project$Backend$UNWIND
+					])))
 		]));
-var $author$project$GMachine$emptyMachine = {builtins: $author$project$Backend$stdLib, code: _List_Nil, dump: _List_Nil, env: $author$project$Backend$emptyEnv, graph: $elm$core$Dict$empty, nodeCounter: 0, stack: _List_Nil, unwinding: false};
-var $author$project$GMachine$incNodeCounter = function (gmachine) {
-	return _Utils_update(
-		gmachine,
-		{nodeCounter: gmachine.nodeCounter + 1});
-};
-var $author$project$GMachine$push = F2(
-	function (node, gmachine) {
-		return _Utils_update(
-			gmachine,
-			{
-				stack: A2($elm$core$List$cons, node, gmachine.stack)
-			});
-	});
-var $author$project$GMachine$updatePointer = F3(
-	function (id, node, gmachine) {
-		return _Utils_update(
-			gmachine,
-			{
-				graph: A3($elm$core$Dict$insert, id, node, gmachine.graph)
-			});
-	});
-var $author$project$GMachine$mkNodeAndPush = F2(
-	function (node, gmachine) {
-		var nodeId = gmachine.nodeCounter;
+var $author$project$GMachine$setup = F2(
+	function (env, mainFunction) {
 		return A2(
-			$author$project$GMachine$push,
-			nodeId,
-			$author$project$GMachine$incNodeCounter(
-				A3($author$project$GMachine$updatePointer, nodeId, node, gmachine)));
-	});
-var $author$project$GMachine$setCode = F2(
-	function (code, gmachine) {
-		return _Utils_update(
-			gmachine,
-			{code: code});
-	});
-var $author$project$GMachine$setEnv = F2(
-	function (env, gmachine) {
-		return _Utils_update(
-			gmachine,
-			{env: env});
+			$author$project$GMachine$enter,
+			mainFunction,
+			A2(
+				$author$project$GMachine$mkNodeAndPush,
+				$author$project$GMachine$GFunc(mainFunction),
+				{
+					builtins: $author$project$Backend$stdLib,
+					ctx: $author$project$GMachine$Unwinding(_List_Nil),
+					dump: _List_Nil,
+					env: env,
+					graph: $elm$core$Dict$empty,
+					nodeCounter: 0
+				}));
 	});
 var $author$project$GMachine$createMachine = function (source) {
 	return A2(
@@ -12610,13 +12762,7 @@ var $author$project$GMachine$createMachine = function (source) {
 			if (_v0.$ === 'Just') {
 				var mainFunction = _v0.a;
 				return (!(!mainFunction.numFormals)) ? $elm$core$Result$Err($author$project$Backend$MainFunctionCannotHaveFormals) : $elm$core$Result$Ok(
-					A2(
-						$author$project$GMachine$setCode,
-						mainFunction.code,
-						A2(
-							$author$project$GMachine$mkNodeAndPush,
-							$author$project$GMachine$GFunc(mainFunction),
-							A2($author$project$GMachine$setEnv, env, $author$project$GMachine$emptyMachine))));
+					A2($author$project$GMachine$setup, env, mainFunction));
 			} else {
 				return $elm$core$Result$Err($author$project$Backend$CannotFindMainFunction);
 			}
@@ -18476,107 +18622,72 @@ var $elm$browser$Browser$Events$onResize = function (func) {
 var $author$project$Main$subscriptions = function (model) {
 	return $elm$browser$Browser$Events$onResize($author$project$Main$WindowResized);
 };
+var $staeter$ziplist$ZipList$current = function (_v0) {
+	var elem = _v0.b;
+	return elem;
+};
+var $staeter$ziplist$ZipList$singleton = function (item) {
+	return A3($staeter$ziplist$ZipList$Zipper, _List_Nil, item, _List_Nil);
+};
+var $author$project$GMachine$accessCode = A2(
+	$arturopala$elm_monocle$Monocle$Lens$Lens,
+	function (ctx) {
+		if (ctx.$ === 'StackFrame') {
+			var frame = ctx.a;
+			return frame.codePtr;
+		} else {
+			return $staeter$ziplist$ZipList$singleton($author$project$Backend$UNWIND);
+		}
+	},
+	F2(
+		function (codePtr, ctx) {
+			if (ctx.$ === 'StackFrame') {
+				var frame = ctx.a;
+				return $author$project$GMachine$StackFrame(
+					_Utils_update(
+						frame,
+						{codePtr: codePtr}));
+			} else {
+				return ctx;
+			}
+		}));
+var $author$project$GMachine$codePtrLens = A2($arturopala$elm_monocle$Monocle$Lens$compose, $author$project$GMachine$accessCtx, $author$project$GMachine$accessCode);
+var $author$project$GMachine$getCodePtr = $author$project$GMachine$codePtrLens.get;
+var $author$project$GMachine$currentInstruction = A2($elm$core$Basics$composeR, $author$project$GMachine$getCodePtr, $staeter$ziplist$ZipList$current);
+var $staeter$ziplist$ZipList$forward = function (zipList) {
+	var _v0 = zipList;
+	var before = _v0.a;
+	var elem = _v0.b;
+	var after = _v0.c;
+	if (!after.b) {
+		return zipList;
+	} else {
+		var head = after.a;
+		var queue = after.b;
+		return A3(
+			$staeter$ziplist$ZipList$Zipper,
+			A2($elm$core$List$cons, elem, before),
+			head,
+			queue);
+	}
+};
+var $author$project$GMachine$incCodePtr = A2($arturopala$elm_monocle$Monocle$Lens$modify, $author$project$GMachine$codePtrLens, $staeter$ziplist$ZipList$forward);
+var $author$project$GMachine$isUnwinding = function (gmachine) {
+	var _v0 = gmachine.ctx;
+	if (_v0.$ === 'Unwinding') {
+		return true;
+	} else {
+		return false;
+	}
+};
+var $author$project$GMachine$startUnwind = A2(
+	$arturopala$elm_monocle$Monocle$Lens$modify,
+	$author$project$GMachine$accessCtx,
+	A2($elm$core$Basics$composeR, $author$project$GMachine$accessStack.get, $author$project$GMachine$Unwinding));
 var $author$project$GMachine$Crash = function (a) {
 	return {$: 'Crash', a: a};
 };
 var $author$project$GMachine$EmptyStack = {$: 'EmptyStack'};
-var $author$project$GMachine$Terminated = F2(
-	function (a, b) {
-		return {$: 'Terminated', a: a, b: b};
-	});
-var $elm$core$Dict$filter = F2(
-	function (isGood, dict) {
-		return A3(
-			$elm$core$Dict$foldl,
-			F3(
-				function (k, v, d) {
-					return A2(isGood, k, v) ? A3($elm$core$Dict$insert, k, v, d) : d;
-				}),
-			$elm$core$Dict$empty,
-			dict);
-	});
-var $elm$core$Maybe$andThen = F2(
-	function (callback, maybeValue) {
-		if (maybeValue.$ === 'Just') {
-			var value = maybeValue.a;
-			return callback(value);
-		} else {
-			return $elm$core$Maybe$Nothing;
-		}
-	});
-var $author$project$GMachine$getChildren = function (node) {
-	if (node.$ === 'GApp') {
-		var left = node.a;
-		var right = node.b;
-		return $elm$core$Maybe$Just(
-			_Utils_Tuple2(left, right));
-	} else {
-		return $elm$core$Maybe$Nothing;
-	}
-};
-var $author$project$GMachine$reachableNodes = F3(
-	function (root, graph, visited) {
-		reachableNodes:
-		while (true) {
-			if (A2($elm$core$Set$member, root, visited)) {
-				return visited;
-			} else {
-				var newVisitedSet = A2($elm$core$Set$insert, root, visited);
-				var _v0 = A2(
-					$elm$core$Maybe$andThen,
-					$author$project$GMachine$getChildren,
-					A2($elm$core$Dict$get, root, graph));
-				if (_v0.$ === 'Just') {
-					var _v1 = _v0.a;
-					var leftChild = _v1.a;
-					var rightChild = _v1.b;
-					var $temp$root = rightChild,
-						$temp$graph = graph,
-						$temp$visited = A3($author$project$GMachine$reachableNodes, leftChild, graph, newVisitedSet);
-					root = $temp$root;
-					graph = $temp$graph;
-					visited = $temp$visited;
-					continue reachableNodes;
-				} else {
-					return newVisitedSet;
-				}
-			}
-		}
-	});
-var $author$project$GMachine$garbageCollection = function (gmachine) {
-	var stack = gmachine.stack;
-	var dump = gmachine.dump;
-	var graph = gmachine.graph;
-	var stackPointers = $elm$core$List$concat(
-		A2(
-			$elm$core$List$cons,
-			stack,
-			A2($elm$core$List$map, $elm$core$Tuple$first, dump)));
-	var reachableCells = A3(
-		$elm$core$List$foldl,
-		F2(
-			function (ref, visited) {
-				return A3($author$project$GMachine$reachableNodes, ref, graph, visited);
-			}),
-		$elm$core$Set$empty,
-		stackPointers);
-	var cleanedGraph = A2(
-		$elm$core$Dict$filter,
-		F2(
-			function (ref, data) {
-				return A2($elm$core$Set$member, ref, reachableCells);
-			}),
-		graph);
-	return _Utils_update(
-		gmachine,
-		{graph: cleanedGraph});
-};
-var $author$project$GMachine$setUnwinding = F2(
-	function (flag, gmachine) {
-		return _Utils_update(
-			gmachine,
-			{unwinding: flag});
-	});
 var $author$project$GMachine$GApp = F2(
 	function (a, b) {
 		return {$: 'GApp', a: a, b: b};
@@ -18631,11 +18742,14 @@ var $elm_community$list_extra$List$Extra$getAt = F2(
 			A2($elm$core$List$drop, idx, xs));
 	});
 var $author$project$GMachine$getFromStack = F2(
-	function (stack, offset) {
+	function (gmachine, offset) {
 		return A2(
 			$elm$core$Result$fromMaybe,
 			$author$project$GMachine$OutOfBoundsStack,
-			A2($elm_community$list_extra$List$Extra$getAt, offset, stack));
+			A2(
+				$elm_community$list_extra$List$Extra$getAt,
+				offset,
+				$author$project$GMachine$getStack(gmachine)));
 	});
 var $author$project$GMachine$getTopVal = function (stack) {
 	return A2($author$project$GMachine$getFromStack, stack, 0);
@@ -18651,25 +18765,35 @@ var $elm$core$Result$map = F2(
 			return $elm$core$Result$Err(e);
 		}
 	});
-var $author$project$GMachine$pop = F2(
-	function (num, gmachine) {
-		return _Utils_update(
-			gmachine,
-			{
-				stack: A2($elm$core$List$drop, num, gmachine.stack)
-			});
-	});
-var $author$project$GMachine$pushContextToDump = F3(
-	function (stack, code, gmachine) {
-		return _Utils_update(
-			gmachine,
-			{
-				dump: A2(
-					$elm$core$List$cons,
-					_Utils_Tuple2(stack, code),
-					gmachine.dump)
-			});
-	});
+var $author$project$GMachine$pop = function (num) {
+	return A2(
+		$arturopala$elm_monocle$Monocle$Lens$modify,
+		$author$project$GMachine$stackLens,
+		$elm$core$List$drop(num));
+};
+var $author$project$GMachine$CannotSaveFrameWhileUnwinding = {$: 'CannotSaveFrameWhileUnwinding'};
+var $author$project$GMachine$saveFrame = function (gmachine) {
+	var _v0 = gmachine.ctx;
+	if (_v0.$ === 'Unwinding') {
+		return $elm$core$Result$Err($author$project$GMachine$CannotSaveFrameWhileUnwinding);
+	} else {
+		var frame = _v0.a;
+		return $elm$core$Result$Ok(
+			_Utils_update(
+				gmachine,
+				{
+					dump: A2($elm$core$List$cons, frame, gmachine.dump)
+				}));
+	}
+};
+var $author$project$GMachine$pushContext = function (gmachine) {
+	return A3(
+		$elm$core$Result$map2,
+		$author$project$GMachine$push,
+		$author$project$GMachine$getTopVal(gmachine),
+		$author$project$GMachine$saveFrame(
+			A2($author$project$GMachine$pop, 1, gmachine)));
+};
 var $author$project$GMachine$UnknownName = function (a) {
 	return {$: 'UnknownName', a: a};
 };
@@ -18722,192 +18846,55 @@ var $author$project$GMachine$retrieveNode = F2(
 			$author$project$GMachine$NodeDoesNotExist(node),
 			A2($elm$core$Dict$get, node, gmachine.graph));
 	});
-var $author$project$GMachine$setDump = F2(
-	function (dump, gmachine) {
-		return _Utils_update(
-			gmachine,
-			{dump: dump});
+var $author$project$GMachine$Terminated = F2(
+	function (a, b) {
+		return {$: 'Terminated', a: a, b: b};
 	});
-var $author$project$GMachine$setStack = F2(
-	function (stack, gmachine) {
-		return _Utils_update(
-			gmachine,
-			{stack: stack});
-	});
-var $elm_community$list_extra$List$Extra$uncons = function (list) {
-	if (!list.b) {
-		return $elm$core$Maybe$Nothing;
-	} else {
-		var first = list.a;
-		var rest = list.b;
+var $author$project$GMachine$popDump = function (gmachine) {
+	return _Utils_update(
+		gmachine,
+		{
+			dump: A2($elm$core$List$drop, 1, gmachine.dump)
+		});
+};
+var $author$project$GMachine$restore = function (gmachine) {
+	var _v0 = gmachine.dump;
+	if (_v0.b) {
+		var frame = _v0.a;
 		return $elm$core$Maybe$Just(
-			_Utils_Tuple2(first, rest));
+			$author$project$GMachine$popDump(
+				A2(
+					$author$project$GMachine$accessCtx.set,
+					$author$project$GMachine$StackFrame(frame),
+					gmachine)));
+	} else {
+		return $elm$core$Maybe$Nothing;
 	}
 };
 var $author$project$GMachine$return = F2(
 	function (retVal, gmachine) {
-		var _v0 = A2(
+		return A2(
 			$elm$core$Maybe$withDefault,
-			_Utils_Tuple2(
-				_Utils_Tuple2(_List_Nil, _List_Nil),
-				_List_Nil),
-			$elm_community$list_extra$List$Extra$uncons(gmachine.dump));
-		var _v1 = _v0.a;
-		var oldStack = _v1.a;
-		var oldCode = _v1.b;
-		var dump = _v0.b;
-		return $elm$core$Result$Ok(
+			A2($author$project$GMachine$Terminated, retVal, gmachine.graph),
 			A2(
-				$author$project$GMachine$push,
-				retVal,
+				$elm$core$Maybe$map,
 				A2(
-					$author$project$GMachine$setDump,
-					dump,
-					A2(
-						$author$project$GMachine$setCode,
-						oldCode,
-						A2($author$project$GMachine$setStack, oldStack, gmachine)))));
+					$elm$core$Basics$composeR,
+					$author$project$GMachine$push(retVal),
+					$author$project$GMachine$Running),
+				$author$project$GMachine$restore(gmachine)));
 	});
 var $author$project$GMachine$runtimeResult = A2($elm_community$result_extra$Result$Extra$unpack, $author$project$GMachine$Crash, $author$project$GMachine$Running);
-var $elm$core$List$takeReverse = F3(
-	function (n, list, kept) {
-		takeReverse:
-		while (true) {
-			if (n <= 0) {
-				return kept;
-			} else {
-				if (!list.b) {
-					return kept;
-				} else {
-					var x = list.a;
-					var xs = list.b;
-					var $temp$n = n - 1,
-						$temp$list = xs,
-						$temp$kept = A2($elm$core$List$cons, x, kept);
-					n = $temp$n;
-					list = $temp$list;
-					kept = $temp$kept;
-					continue takeReverse;
-				}
-			}
-		}
-	});
-var $elm$core$List$takeTailRec = F2(
-	function (n, list) {
-		return $elm$core$List$reverse(
-			A3($elm$core$List$takeReverse, n, list, _List_Nil));
-	});
-var $elm$core$List$takeFast = F3(
-	function (ctr, n, list) {
-		if (n <= 0) {
-			return _List_Nil;
-		} else {
-			var _v0 = _Utils_Tuple2(n, list);
-			_v0$1:
-			while (true) {
-				_v0$5:
-				while (true) {
-					if (!_v0.b.b) {
-						return list;
-					} else {
-						if (_v0.b.b.b) {
-							switch (_v0.a) {
-								case 1:
-									break _v0$1;
-								case 2:
-									var _v2 = _v0.b;
-									var x = _v2.a;
-									var _v3 = _v2.b;
-									var y = _v3.a;
-									return _List_fromArray(
-										[x, y]);
-								case 3:
-									if (_v0.b.b.b.b) {
-										var _v4 = _v0.b;
-										var x = _v4.a;
-										var _v5 = _v4.b;
-										var y = _v5.a;
-										var _v6 = _v5.b;
-										var z = _v6.a;
-										return _List_fromArray(
-											[x, y, z]);
-									} else {
-										break _v0$5;
-									}
-								default:
-									if (_v0.b.b.b.b && _v0.b.b.b.b.b) {
-										var _v7 = _v0.b;
-										var x = _v7.a;
-										var _v8 = _v7.b;
-										var y = _v8.a;
-										var _v9 = _v8.b;
-										var z = _v9.a;
-										var _v10 = _v9.b;
-										var w = _v10.a;
-										var tl = _v10.b;
-										return (ctr > 1000) ? A2(
-											$elm$core$List$cons,
-											x,
-											A2(
-												$elm$core$List$cons,
-												y,
-												A2(
-													$elm$core$List$cons,
-													z,
-													A2(
-														$elm$core$List$cons,
-														w,
-														A2($elm$core$List$takeTailRec, n - 4, tl))))) : A2(
-											$elm$core$List$cons,
-											x,
-											A2(
-												$elm$core$List$cons,
-												y,
-												A2(
-													$elm$core$List$cons,
-													z,
-													A2(
-														$elm$core$List$cons,
-														w,
-														A3($elm$core$List$takeFast, ctr + 1, n - 4, tl)))));
-									} else {
-										break _v0$5;
-									}
-							}
-						} else {
-							if (_v0.a === 1) {
-								break _v0$1;
-							} else {
-								break _v0$5;
-							}
-						}
-					}
-				}
-				return list;
-			}
-			var _v1 = _v0.b;
-			var x = _v1.a;
-			return _List_fromArray(
-				[x]);
-		}
-	});
-var $elm$core$List$take = F2(
-	function (n, list) {
-		return A3($elm$core$List$takeFast, 0, n, list);
-	});
 var $author$project$GMachine$stateTransition = F2(
 	function (instruction, gmachine) {
-		var stack = gmachine.stack;
-		var code = gmachine.code;
-		var dump = gmachine.dump;
 		var topMostNode = A2(
 			$elm$core$Result$andThen,
 			$author$project$GMachine$retrieveNode(gmachine),
-			$author$project$GMachine$getTopVal(stack));
+			$author$project$GMachine$getTopVal(gmachine));
 		var sndTopMostNode = A2(
 			$elm$core$Result$andThen,
 			$author$project$GMachine$retrieveNode(gmachine),
-			A2($author$project$GMachine$getFromStack, stack, 1));
+			A2($author$project$GMachine$getFromStack, gmachine, 1));
 		var _v0 = _Utils_Tuple3(instruction, topMostNode, sndTopMostNode);
 		_v0$20:
 		while (true) {
@@ -18938,34 +18925,19 @@ var $author$project$GMachine$stateTransition = F2(
 							case 'GApp':
 								var _v1 = _v0.a;
 								var _v2 = _v0.b.a;
-								return $author$project$GMachine$Running(
-									A3(
-										$author$project$GMachine$pushContextToDump,
-										A2($elm$core$List$drop, 1, stack),
-										code,
-										A2(
-											$author$project$GMachine$setCode,
-											_List_fromArray(
-												[$author$project$Backend$UNWIND]),
-											A2(
-												$author$project$GMachine$setStack,
-												A2($elm$core$List$take, 1, stack),
-												gmachine))));
+								return $author$project$GMachine$runtimeResult(
+									A2(
+										$elm$core$Result$map,
+										$author$project$GMachine$startUnwind,
+										$author$project$GMachine$pushContext(gmachine)));
 							case 'GFunc':
 								var _v3 = _v0.a;
 								var global = _v0.b.a.a;
-								return (!global.numFormals) ? $author$project$GMachine$Running(
-									A3(
-										$author$project$GMachine$pushContextToDump,
-										A2($elm$core$List$drop, 1, stack),
-										code,
-										A2(
-											$author$project$GMachine$setCode,
-											global.code,
-											A2(
-												$author$project$GMachine$setStack,
-												A2($elm$core$List$take, 1, stack),
-												gmachine)))) : $author$project$GMachine$Running(gmachine);
+								return (!global.numFormals) ? $author$project$GMachine$runtimeResult(
+									A2(
+										$elm$core$Result$map,
+										$author$project$GMachine$enter(global),
+										$author$project$GMachine$pushContext(gmachine))) : $author$project$GMachine$Running(gmachine);
 							case 'GInt':
 								var _v4 = _v0.a;
 								return $author$project$GMachine$Running(gmachine);
@@ -18984,55 +18956,34 @@ var $author$project$GMachine$stateTransition = F2(
 								var n1 = _v6.a;
 								var n2 = _v6.b;
 								return $author$project$GMachine$Running(
-									A2(
-										$author$project$GMachine$setCode,
-										_List_fromArray(
-											[$author$project$Backend$UNWIND]),
-										A2($author$project$GMachine$push, n1, gmachine)));
+									A2($author$project$GMachine$push, n1, gmachine));
 							case 'GFunc':
 								var _v7 = _v0.a;
 								var global = _v0.b.a.a;
-								var enoughArguments = _Utils_cmp(
-									$elm$core$List$length(stack),
-									global.numFormals) > 0;
+								var stackLength = $elm$core$List$length(
+									$author$project$GMachine$getStack(gmachine));
+								var enoughArguments = _Utils_cmp(stackLength, global.numFormals) > 0;
 								if (enoughArguments) {
 									return $author$project$GMachine$Running(
-										A2($author$project$GMachine$setCode, global.code, gmachine));
+										A2($author$project$GMachine$enter, global, gmachine));
 								} else {
 									var _v8 = $elm$core$List$head(
-										$elm$core$List$reverse(stack));
+										$elm$core$List$reverse(
+											$author$project$GMachine$getStack(gmachine)));
 									if (_v8.$ === 'Just') {
 										var redexRoot = _v8.a;
-										if (dump.b) {
-											var _v10 = dump.a;
-											var oldStack = _v10.a;
-											var oldCode = _v10.b;
-											var dump_ = dump.b;
-											return $author$project$GMachine$Running(
-												A2(
-													$author$project$GMachine$setDump,
-													dump_,
-													A2(
-														$author$project$GMachine$setCode,
-														oldCode,
-														A2(
-															$author$project$GMachine$setStack,
-															A2($elm$core$List$cons, redexRoot, oldStack),
-															gmachine))));
-										} else {
-											return A2($author$project$GMachine$Terminated, redexRoot, gmachine.graph);
-										}
+										return A2($author$project$GMachine$return, redexRoot, gmachine);
 									} else {
 										return $author$project$GMachine$Crash($author$project$GMachine$EmptyStack);
 									}
 								}
 							case 'GInt':
-								var _v11 = _v0.a;
-								return $author$project$GMachine$runtimeResult(
-									A2(
-										$elm$core$Result$andThen,
-										A2($elm_community$basics_extra$Basics$Extra$flip, $author$project$GMachine$return, gmachine),
-										$author$project$GMachine$getTopVal(stack)));
+								var _v9 = _v0.a;
+								return A3(
+									$elm_community$result_extra$Result$Extra$unpack,
+									$author$project$GMachine$Crash,
+									A2($elm_community$basics_extra$Basics$Extra$flip, $author$project$GMachine$return, gmachine),
+									$author$project$GMachine$getTopVal(gmachine));
 							default:
 								break _v0$20;
 						}
@@ -19053,7 +19004,7 @@ var $author$project$GMachine$stateTransition = F2(
 										1,
 										A3($author$project$GMachine$updatePointer, addr, nodeOnTop, gmachine)));
 							},
-							A2($author$project$GMachine$getFromStack, stack, k));
+							A2($author$project$GMachine$getFromStack, gmachine, k));
 					} else {
 						break _v0$20;
 					}
@@ -19067,7 +19018,7 @@ var $author$project$GMachine$stateTransition = F2(
 						A2(
 							$elm$core$Result$map,
 							A2($elm_community$basics_extra$Basics$Extra$flip, $author$project$GMachine$push, gmachine),
-							A2($author$project$GMachine$getFromStack, stack, k)));
+							A2($author$project$GMachine$getFromStack, gmachine, k)));
 				case 'PUSHINT':
 					var x = _v0.a.a;
 					return $author$project$GMachine$Running(
@@ -19087,9 +19038,9 @@ var $author$project$GMachine$stateTransition = F2(
 								A2(
 									$elm$core$Result$andThen,
 									$author$project$GMachine$retrieveNode(gmachine),
-									A2($author$project$GMachine$getFromStack, stack, k)))));
+									A2($author$project$GMachine$getFromStack, gmachine, k)))));
 				case 'MKAP':
-					var _v12 = _v0.a;
+					var _v10 = _v0.a;
 					return $author$project$GMachine$runtimeResult(
 						A3(
 							$elm$core$Result$map2,
@@ -19100,11 +19051,11 @@ var $author$project$GMachine$stateTransition = F2(
 										A2($author$project$GMachine$GApp, n1, n2),
 										A2($author$project$GMachine$pop, 2, gmachine));
 								}),
-							A2($author$project$GMachine$getFromStack, stack, 0),
-							A2($author$project$GMachine$getFromStack, stack, 1)));
+							A2($author$project$GMachine$getFromStack, gmachine, 0),
+							A2($author$project$GMachine$getFromStack, gmachine, 1)));
 				case 'ADD':
 					if ((((_v0.b.$ === 'Ok') && (_v0.b.a.$ === 'GInt')) && (_v0.c.$ === 'Ok')) && (_v0.c.a.$ === 'GInt')) {
-						var _v13 = _v0.a;
+						var _v11 = _v0.a;
 						var x = _v0.b.a.a;
 						var y = _v0.c.a.a;
 						return $author$project$GMachine$Running(
@@ -19117,7 +19068,7 @@ var $author$project$GMachine$stateTransition = F2(
 					}
 				case 'SUB':
 					if ((((_v0.b.$ === 'Ok') && (_v0.b.a.$ === 'GInt')) && (_v0.c.$ === 'Ok')) && (_v0.c.a.$ === 'GInt')) {
-						var _v14 = _v0.a;
+						var _v12 = _v0.a;
 						var x = _v0.b.a.a;
 						var y = _v0.c.a.a;
 						return $author$project$GMachine$Running(
@@ -19130,23 +19081,20 @@ var $author$project$GMachine$stateTransition = F2(
 					}
 				case 'MUL':
 					if ((((_v0.b.$ === 'Ok') && (_v0.b.a.$ === 'GInt')) && (_v0.c.$ === 'Ok')) && (_v0.c.a.$ === 'GInt')) {
-						var _v15 = _v0.a;
+						var _v13 = _v0.a;
 						var x = _v0.b.a.a;
 						var y = _v0.c.a.a;
 						return $author$project$GMachine$Running(
 							A2(
 								$author$project$GMachine$mkNodeAndPush,
 								$author$project$GMachine$GInt(x * y),
-								A2(
-									$author$project$GMachine$setStack,
-									A2($elm$core$List$drop, 2, stack),
-									gmachine)));
+								A2($author$project$GMachine$pop, 2, gmachine)));
 					} else {
 						break _v0$20;
 					}
 				case 'DIV':
 					if ((((_v0.b.$ === 'Ok') && (_v0.b.a.$ === 'GInt')) && (_v0.c.$ === 'Ok')) && (_v0.c.a.$ === 'GInt')) {
-						var _v16 = _v0.a;
+						var _v14 = _v0.a;
 						var x = _v0.b.a.a;
 						var y = _v0.c.a.a;
 						return $author$project$GMachine$Running(
@@ -19159,7 +19107,7 @@ var $author$project$GMachine$stateTransition = F2(
 					}
 				case 'EQU':
 					if ((((_v0.b.$ === 'Ok') && (_v0.b.a.$ === 'GInt')) && (_v0.c.$ === 'Ok')) && (_v0.c.a.$ === 'GInt')) {
-						var _v17 = _v0.a;
+						var _v15 = _v0.a;
 						var x = _v0.b.a.a;
 						var y = _v0.c.a.a;
 						return $author$project$GMachine$Running(
@@ -19183,7 +19131,7 @@ var $author$project$GMachine$stateTransition = F2(
 									$author$project$GMachine$push(topVal),
 									gmachine);
 							},
-							$author$project$GMachine$getTopVal(stack)));
+							$author$project$GMachine$getTopVal(gmachine)));
 			}
 		}
 		var node = _v0.b;
@@ -19194,42 +19142,22 @@ var $author$project$GMachine$stateTransition = F2(
 			A3(
 				$elm$core$Result$map2,
 				$author$project$GMachine$UnexpectedNode,
-				$author$project$GMachine$getTopVal(stack),
+				$author$project$GMachine$getTopVal(gmachine),
 				node));
 	});
 var $author$project$GMachine$step = function (machine) {
-	var _v0 = _Utils_Tuple3(machine.code, machine.stack, machine.unwinding);
-	if (_v0.a.b) {
-		if ((_v0.a.a.$ === 'UNWIND') && (!_v0.c)) {
-			var _v1 = _v0.a;
-			var _v2 = _v1.a;
-			return $author$project$GMachine$Running(
-				A2(
-					$author$project$GMachine$setUnwinding,
-					true,
-					$author$project$GMachine$garbageCollection(machine)));
+	if ($author$project$GMachine$isUnwinding(machine)) {
+		return A2($author$project$GMachine$stateTransition, $author$project$Backend$UNWIND, machine);
+	} else {
+		var _v0 = $author$project$GMachine$currentInstruction(machine);
+		if (_v0.$ === 'UNWIND') {
+			return A2($elm$core$Basics$composeR, $author$project$GMachine$startUnwind, $author$project$GMachine$step)(machine);
 		} else {
-			var _v3 = _v0.a;
-			var nextInstruction = _v3.a;
-			var code = _v3.b;
+			var instruction = _v0;
 			return A2(
 				$author$project$GMachine$stateTransition,
-				nextInstruction,
-				A2(
-					$author$project$GMachine$setCode,
-					code,
-					A2(
-						$author$project$GMachine$setUnwinding,
-						_Utils_eq(nextInstruction, $author$project$Backend$UNWIND),
-						machine)));
-		}
-	} else {
-		if (_v0.b.b) {
-			var _v4 = _v0.b;
-			var result = _v4.a;
-			return A2($author$project$GMachine$Terminated, result, machine.graph);
-		} else {
-			return $author$project$GMachine$Crash($author$project$GMachine$EmptyStack);
+				instruction,
+				$author$project$GMachine$incCodePtr(machine));
 		}
 	}
 };
@@ -20789,15 +20717,33 @@ var $author$project$Backend$gCodeToString = function (instruction) {
 			return 'EQU';
 	}
 };
-var $author$project$Main$viewCode = function (code) {
+var $phollyer$elm_ui_colors$Colors$Opaque$lime = A3($mdgriffith$elm_ui$Element$rgb255, 0, 255, 0);
+var $author$project$Main$viewCode = function (_v0) {
+	var past = _v0.a;
+	var current = _v0.b;
+	var rest = _v0.c;
+	var toText = A2($elm$core$Basics$composeR, $author$project$Backend$gCodeToString, $mdgriffith$elm_ui$Element$text);
 	return A2(
 		$mdgriffith$elm_ui$Element$column,
 		_List_fromArray(
 			[$author$project$Main$fillHeight, $author$project$Main$fillWidth]),
-		A2(
-			$elm$core$List$map,
-			A2($elm$core$Basics$composeR, $author$project$Backend$gCodeToString, $mdgriffith$elm_ui$Element$text),
-			code));
+		_Utils_ap(
+			A2(
+				$elm$core$List$map,
+				toText,
+				$elm$core$List$reverse(past)),
+			_Utils_ap(
+				_List_fromArray(
+					[
+						A2(
+						$mdgriffith$elm_ui$Element$el,
+						_List_fromArray(
+							[
+								$mdgriffith$elm_ui$Element$Background$color($phollyer$elm_ui_colors$Colors$Opaque$lime)
+							]),
+						toText(current))
+					]),
+				A2($elm$core$List$map, toText, rest))));
 };
 var $goyalarchit$elm_dagre$Render$StandardDrawers$Types$Spline = {$: 'Spline'};
 var $goyalarchit$elm_dagre$Render$StandardDrawers$Types$Vee = {$: 'Vee'};
@@ -21929,6 +21875,132 @@ var $folkertdev$one_true_path_experiment$Segment$arcLengthParameterized = F2(
 					$elm$core$Result$toMaybe(
 						$ianmackenzie$elm_geometry$EllipticalArc2d$nondegenerate(arc)));
 		}
+	});
+var $elm$core$List$takeReverse = F3(
+	function (n, list, kept) {
+		takeReverse:
+		while (true) {
+			if (n <= 0) {
+				return kept;
+			} else {
+				if (!list.b) {
+					return kept;
+				} else {
+					var x = list.a;
+					var xs = list.b;
+					var $temp$n = n - 1,
+						$temp$list = xs,
+						$temp$kept = A2($elm$core$List$cons, x, kept);
+					n = $temp$n;
+					list = $temp$list;
+					kept = $temp$kept;
+					continue takeReverse;
+				}
+			}
+		}
+	});
+var $elm$core$List$takeTailRec = F2(
+	function (n, list) {
+		return $elm$core$List$reverse(
+			A3($elm$core$List$takeReverse, n, list, _List_Nil));
+	});
+var $elm$core$List$takeFast = F3(
+	function (ctr, n, list) {
+		if (n <= 0) {
+			return _List_Nil;
+		} else {
+			var _v0 = _Utils_Tuple2(n, list);
+			_v0$1:
+			while (true) {
+				_v0$5:
+				while (true) {
+					if (!_v0.b.b) {
+						return list;
+					} else {
+						if (_v0.b.b.b) {
+							switch (_v0.a) {
+								case 1:
+									break _v0$1;
+								case 2:
+									var _v2 = _v0.b;
+									var x = _v2.a;
+									var _v3 = _v2.b;
+									var y = _v3.a;
+									return _List_fromArray(
+										[x, y]);
+								case 3:
+									if (_v0.b.b.b.b) {
+										var _v4 = _v0.b;
+										var x = _v4.a;
+										var _v5 = _v4.b;
+										var y = _v5.a;
+										var _v6 = _v5.b;
+										var z = _v6.a;
+										return _List_fromArray(
+											[x, y, z]);
+									} else {
+										break _v0$5;
+									}
+								default:
+									if (_v0.b.b.b.b && _v0.b.b.b.b.b) {
+										var _v7 = _v0.b;
+										var x = _v7.a;
+										var _v8 = _v7.b;
+										var y = _v8.a;
+										var _v9 = _v8.b;
+										var z = _v9.a;
+										var _v10 = _v9.b;
+										var w = _v10.a;
+										var tl = _v10.b;
+										return (ctr > 1000) ? A2(
+											$elm$core$List$cons,
+											x,
+											A2(
+												$elm$core$List$cons,
+												y,
+												A2(
+													$elm$core$List$cons,
+													z,
+													A2(
+														$elm$core$List$cons,
+														w,
+														A2($elm$core$List$takeTailRec, n - 4, tl))))) : A2(
+											$elm$core$List$cons,
+											x,
+											A2(
+												$elm$core$List$cons,
+												y,
+												A2(
+													$elm$core$List$cons,
+													z,
+													A2(
+														$elm$core$List$cons,
+														w,
+														A3($elm$core$List$takeFast, ctr + 1, n - 4, tl)))));
+									} else {
+										break _v0$5;
+									}
+							}
+						} else {
+							if (_v0.a === 1) {
+								break _v0$1;
+							} else {
+								break _v0$5;
+							}
+						}
+					}
+				}
+				return list;
+			}
+			var _v1 = _v0.b;
+			var x = _v1.a;
+			return _List_fromArray(
+				[x]);
+		}
+	});
+var $elm$core$List$take = F2(
+	function (n, list) {
+		return A3($elm$core$List$takeFast, 0, n, list);
 	});
 var $elm_community$list_extra$List$Extra$splitAt = F2(
 	function (n, xs) {
@@ -25025,6 +25097,16 @@ var $author$project$Main$drawNode = F2(
 					]));
 		}
 	});
+var $author$project$GMachine$getChildren = function (node) {
+	if (node.$ === 'GApp') {
+		var left = node.a;
+		var right = node.b;
+		return $elm$core$Maybe$Just(
+			_Utils_Tuple2(left, right));
+	} else {
+		return $elm$core$Maybe$Nothing;
+	}
+};
 var $author$project$Main$getEdges = function (graph) {
 	return A2(
 		$elm$core$List$concatMap,
@@ -25123,20 +25205,19 @@ var $author$project$Main$drawPointer = function (_v0) {
 		});
 };
 var $author$project$Main$drawStack = F3(
-	function (_v0, _v1, cellWidth) {
-		var stack = _v0.stack;
-		var coordDict = _v1.coordDict;
+	function (machine, _v0, cellWidth) {
+		var coordDict = _v0.coordDict;
 		var cellHeight = cellWidth * 0.5;
 		var cells = $elm$core$List$concat(
 			A2(
 				$elm$core$List$indexedMap,
 				F2(
 					function (i, nodeid) {
-						var _v2 = A2($elm$core$Dict$get, nodeid, coordDict);
-						if (_v2.$ === 'Just') {
-							var _v3 = _v2.a;
-							var nodeX = _v3.a;
-							var nodeY = _v3.b;
+						var _v1 = A2($elm$core$Dict$get, nodeid, coordDict);
+						if (_v1.$ === 'Just') {
+							var _v2 = _v1.a;
+							var nodeX = _v2.a;
+							var nodeY = _v2.b;
 							return _List_fromArray(
 								[
 									A4($author$project$Main$drawCell, 0, cellHeight * i, cellWidth, cellHeight),
@@ -25160,7 +25241,8 @@ var $author$project$Main$drawStack = F3(
 								]);
 						}
 					}),
-				$elm$core$List$reverse(stack)));
+				$elm$core$List$reverse(
+					$author$project$GMachine$getStack(machine))));
 		return A2($elm_community$typed_svg$TypedSvg$g, _List_Nil, cells);
 	});
 var $author$project$Main$fitLayout = F3(
@@ -25725,6 +25807,15 @@ var $elm_community$graph$Graph$crashHack = function (msg) {
 		continue crashHack;
 	}
 };
+var $elm$core$Maybe$andThen = F2(
+	function (callback, maybeValue) {
+		if (maybeValue.$ === 'Just') {
+			var value = maybeValue.a;
+			return callback(value);
+		} else {
+			return $elm$core$Maybe$Nothing;
+		}
+	});
 var $elm_community$graph$Graph$unGraph = function (graph) {
 	var rep = graph.a;
 	return rep;
@@ -28195,6 +28286,16 @@ var $goyalarchit$elm_dagre$Dagre$Order$sweepLayers = F2(
 			$elm$core$List$reverse(
 				A2($elm$core$List$range, 0, maxRank - 1)));
 	});
+var $elm_community$list_extra$List$Extra$uncons = function (list) {
+	if (!list.b) {
+		return $elm$core$Maybe$Nothing;
+	} else {
+		var first = list.a;
+		var rest = list.b;
+		return $elm$core$Maybe$Just(
+			_Utils_Tuple2(first, rest));
+	}
+};
 var $elm_community$list_extra$List$Extra$swapAt = F3(
 	function (index1, index2, l) {
 		swapAt:
@@ -28541,8 +28642,8 @@ var $author$project$Main$view = function (_v0) {
 						_Debug_todo(
 							'Main',
 							{
-								start: {line: 315, column: 66},
-								end: {line: 315, column: 76}
+								start: {line: 320, column: 66},
+								end: {line: 320, column: 76}
 							}))
 					]),
 				_List_fromArray(
@@ -28556,7 +28657,7 @@ var $author$project$Main$view = function (_v0) {
 					])),
 				function () {
 				if ((machine.$ === 'StaticView') && (machine.a.$ === 'Running')) {
-					var code = machine.a.a.code;
+					var m = machine.a.a;
 					return A2(
 						$mdgriffith$elm_ui$Element$el,
 						_List_fromArray(
@@ -28565,7 +28666,8 @@ var $author$project$Main$view = function (_v0) {
 								$mdgriffith$elm_ui$Element$fillPortion(2)),
 								$author$project$Main$fillHeight
 							]),
-						$author$project$Main$viewCode(code));
+						$author$project$Main$viewCode(
+							$author$project$GMachine$getCodePtr(m)));
 				} else {
 					return $mdgriffith$elm_ui$Element$none;
 				}
@@ -28582,8 +28684,8 @@ var $author$project$Main$view = function (_v0) {
 						_Debug_todo(
 							'Main',
 							{
-								start: {line: 322, column: 95},
-								end: {line: 322, column: 105}
+								start: {line: 327, column: 95},
+								end: {line: 327, column: 105}
 							}))
 					]),
 				$author$project$Main$viewMachine(machine))

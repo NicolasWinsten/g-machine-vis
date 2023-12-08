@@ -29,6 +29,7 @@ import Html
 import Browser.Events exposing (onResize)
 import Task
 import Browser.Dom exposing (getViewport)
+import ZipList exposing (ZipList, ZipList(..))
 
 type MachineViewState
   = StaticView G.RuntimeResult
@@ -271,7 +272,7 @@ drawPointer {source, target, agletLength} =
       }
 
 drawStack : G.GMachine -> D.GraphLayout -> Float -> Svg msg
-drawStack {stack} {coordDict} cellWidth =
+drawStack machine {coordDict} cellWidth =
   let
     cellHeight = cellWidth * 0.5
     cells = List.indexedMap (\i nodeid -> case Dict.get nodeid coordDict of
@@ -285,12 +286,12 @@ drawStack {stack} {coordDict} cellWidth =
           ]
         Nothing -> [Svg.text_ [] [TypedSvg.Core.text "Failure drawing cell"]]
       )
-      (List.reverse stack)
+      (List.reverse <| G.getStack machine)
       |> List.concat
   in Svg.g [] cells
 
 -- TODO remove this function
-drawTerminatedMachine : G.NodeId -> G.GGraph -> Svg msg
+drawTerminatedMachine : G.HeapAddr -> G.GGraph -> Svg msg
 drawTerminatedMachine node graph =
   let layout = flipLayout <| runLayout graph
   in Svg.svg [SvgA.viewBox 0 0 layout.width layout.height] [drawGraph graph layout]
@@ -305,9 +306,13 @@ viewMachine machine = case machine of
   FailedToCompile err -> E.text "failed to compile"
   Uninitialized -> E.text "Write your program and click compile!"
   
-viewCode : List Backend.GCode -> E.Element msg
-viewCode code = E.column [fillHeight, fillWidth]
-  (List.map (Backend.gCodeToString >> E.text) code) 
+viewCode : ZipList Backend.GCode -> E.Element msg
+viewCode (Zipper past current rest) =
+  let toText = Backend.gCodeToString >> E.text
+  in E.column [fillHeight, fillWidth] <|
+    List.map toText (List.reverse past)
+    ++ [E.el [Background.color Color.lime] (toText current)]
+    ++ List.map toText rest 
 
 view : Model -> E.Element Msg
 view {sourceCode, machine, viewport} =
@@ -317,7 +322,7 @@ view {sourceCode, machine, viewport} =
         , E.row [] [compileButton, stepButton]
         ]
     , case machine of
-        StaticView (G.Running {code}) -> E.el [E.width (E.fillPortion 2), fillHeight] (viewCode code)
+        StaticView (G.Running m) -> E.el [E.width (E.fillPortion 2), fillHeight] (viewCode (G.getCodePtr m))
         _ -> E.none
     , E.el [E.width (E.fillPortion 5), E.height (E.maximum viewport.height E.fill), E.explain Debug.todo]
       (viewMachine machine) 

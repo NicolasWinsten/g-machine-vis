@@ -8,6 +8,9 @@ import Frontend exposing (..)
 import Dict as Dict
 import Dict exposing (Dict)
 import Basics.Extra exposing (uncurry)
+import List.Nonempty exposing (Nonempty(..))
+import Render.StandardDrawers.Types exposing (ArrowHeadShape(..))
+import List.Nonempty as Nonempty
 
 type alias Name = String
 
@@ -64,7 +67,7 @@ gCodeToString instruction = case instruction of
   DIV             -> "DIV"
   EQU             -> "EQU"
 
-type alias Global = {name : Name, numFormals : Int, code : List GCode}
+type alias Global = {name : Name, numFormals : Int, code : Nonempty GCode}
 
 type CompilerError
   = SuperCombinatorNameClash Name
@@ -88,11 +91,11 @@ stdLib : Env
 stdLib = List.foldl
   (\def -> Dict.insert def.name def)
   emptyEnv
-  [ Global "+" 2 [PUSHARG 2, EVAL, PUSHARG 2, EVAL, ADD, UPDATE 3, POP 2, UNWIND]
-  , Global "-" 2 [PUSHARG 2, EVAL, PUSHARG 2, EVAL, SUB, UPDATE 3, POP 2, UNWIND]
-  , Global "*" 2 [PUSHARG 2, EVAL, PUSHARG 2, EVAL, MUL, UPDATE 3, POP 2, UNWIND]
-  , Global "/" 2 [PUSHARG 2, EVAL, PUSHARG 2, EVAL, DIV, UPDATE 3, POP 2, UNWIND]
-  , Global "==" 2 [PUSHARG 2, EVAL, PUSHARG 2, EVAL, EQU, UPDATE 3, POP 2, UNWIND]
+  [ Global "+" 2 <| Nonempty (PUSHARG 2) [EVAL, PUSHARG 2, EVAL, ADD, UPDATE 3, POP 2, UNWIND]
+  , Global "-" 2 <| Nonempty (PUSHARG 2) [EVAL, PUSHARG 2, EVAL, SUB, UPDATE 3, POP 2, UNWIND]
+  , Global "*" 2 <| Nonempty (PUSHARG 2) [EVAL, PUSHARG 2, EVAL, MUL, UPDATE 3, POP 2, UNWIND]
+  , Global "/" 2 <| Nonempty (PUSHARG 2) [EVAL, PUSHARG 2, EVAL, DIV, UPDATE 3, POP 2, UNWIND]
+  , Global "==" 2 <| Nonempty (PUSHARG 2) [EVAL, PUSHARG 2, EVAL, EQU, UPDATE 3, POP 2, UNWIND]
   ]
 
 compileASTs : List SuperCombinator -> Result CompilerError Env
@@ -132,44 +135,48 @@ compileSuperCombinator (SC name formals body) =
       stackPositionsOfFormals = formalsToStackPosition formals
   in {name=name, numFormals=numFormals, code=compileBody body stackPositionsOfFormals numFormals}
 
-compileBody : SCExpr -> FormalMapping -> Context -> List GCode
-compileBody body stackPos context = compileInstantiation body context stackPos context
-  ++ [ UPDATE (context + 1) ]  -- overwrite pointer of redex root to root of new instance
-  ++ (if context == 0 then [] else [ POP context ]) -- POP arguments off the stack
-  ++ [ UNWIND ]                -- continue next reduction
+compileBody : SCExpr -> FormalMapping -> Context -> Nonempty GCode
+compileBody body stackPos context = Nonempty.append
+  (compileInstantiation body context stackPos context)
+  (Nonempty (UPDATE (context + 1)) <|
+    ((if context == 0 then [] else [ POP context ]) ++ [UNWIND])
+  )
 
 {-|
 generate the G-code for instantiating an expression into the graph
 -}
-compileInstantiation : SCExpr -> Int -> FormalMapping -> Context -> List GCode
+compileInstantiation : SCExpr -> Int -> FormalMapping -> Context -> Nonempty GCode
 compileInstantiation e numFormals mapping context = case e of
     SCIdent name -> case getStackPos name mapping of
       -- if the name is a formal parameter, push a pointer to it onto the stack
       -- how to know if it is an argument or not?
-      Just offset -> [ PUSHARG (context - offset + 1) ]
+      Just offset -> Nonempty.singleton ( PUSHARG (context - offset + 1) )
 
       -- otherwise, assume it is a global function
-      Nothing -> [ PUSHGLOBAL name ]
+      Nothing -> Nonempty.singleton ( PUSHGLOBAL name )
     
-    SCInt x -> [ PUSHINT x ]
+    SCInt x -> Nonempty.singleton ( PUSHINT x )
     
-    SCApp e1 e2   ->
-      compileInstantiation e2 numFormals mapping context
-      ++ compileInstantiation e1 numFormals mapping (context + 1)
-      ++ [MKAP]
+    SCApp e1 e2   -> Nonempty.concat <|
+      Nonempty (compileInstantiation e2 numFormals mapping context)
+      [ compileInstantiation e1 numFormals mapping (context + 1)
+      , Nonempty.singleton MKAP
+      ]
     
-    SCLet (name, def_) body ->
-      compileInstantiation def_ numFormals mapping context
-      ++ compileInstantiation body numFormals (Dict.insert name (context + 1) mapping) (context + 1)
-      ++ [SLIDE 1]
+    SCLet (name, def_) body -> Nonempty.concat <|
+      Nonempty (compileInstantiation def_ numFormals mapping context)
+      [ compileInstantiation body numFormals (Dict.insert name (context + 1) mapping) (context + 1)
+      , Nonempty.singleton (SLIDE 1)
+      ]
 
     SCLetRec bindings body ->
       let mapping_ = augmentMapping bindings mapping context
           context_ = context + List.length bindings
-      in
-      compileLetRecBindings bindings numFormals mapping_ context_
-      ++ compileInstantiation body numFormals mapping_ context_
-      ++ [SLIDE (context_ - context)]
+      in Nonempty.concat <|
+        Nonempty (compileLetRecBindings bindings numFormals mapping_ context_)
+        [ compileInstantiation body numFormals mapping_ context_
+        , Nonempty.singleton (SLIDE (context_ - context))
+        ]
 
 {-| remake the stack mapping for a list of new bindings in a letrec expression
 -}
@@ -178,12 +185,16 @@ augmentMapping bindings mapping context = List.indexedMap
   (\i (name,_) -> (name, i + context + 1)) bindings
   |> List.foldl (uncurry Dict.insert) mapping
 
-compileLetRecBindings : List Binding -> Int -> FormalMapping -> Context -> List GCode
+compileLetRecBindings : List Binding -> Int -> FormalMapping -> Context -> Nonempty GCode
 compileLetRecBindings bindings numFormals mapping context =
   let numBindings = List.length bindings
   in
-  [ALLOC numBindings] :: (
+  Nonempty (ALLOC numBindings) (
     List.indexedMap
-    (\i (name, e) -> compileInstantiation e numFormals mapping context ++ [UPDATE (numBindings - i)])
+    (\i (name, e) ->
+      Nonempty.toList (compileInstantiation e numFormals mapping context)
+      ++ [UPDATE (numBindings - i)]
+    )
     bindings
-  ) |> List.concat
+    |> List.concat
+  )
