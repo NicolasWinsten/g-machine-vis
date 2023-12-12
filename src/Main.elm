@@ -111,11 +111,19 @@ deleteNodeFromLayout = Graph.remove
 makeForceSim : GraphLayout -> Force.State G.HeapAddr
 makeForceSim layout =
   let edges = List.map (\{from, to} -> (from, to)) (Graph.edges layout)
+
+      -- gravitate all nodes towards center to mitigate fly away
+      gravitateNodes = List.map
+        (\id -> {node=id, strength=0.01, target=0})
+        (Graph.nodeIds layout)
+
   in Force.iterations 1000
   <| Force.simulation
-  [ Force.manyBodyStrength (-5) (Graph.nodeIds layout)
+  [ Force.manyBody (Graph.nodeIds layout)
   , Force.links edges
   , Force.center 0 0
+  , Force.towardsX gravitateNodes
+  , Force.towardsY gravitateNodes
   ]
 
 resetForceSim : MachineView -> MachineView
@@ -179,9 +187,11 @@ stepMachineView mview =
 
 initialProgram =
   """
-min x y = x-y
-double x=x+x
-main = 3 - 1 - 3
+double x = x + x
+
+twice f x = f (f x)
+
+main = twice double 2
 """
 
 compileSourceCode : String -> Model -> Model
@@ -313,34 +323,22 @@ layoutDimensions layout =
   in {width=maxX - minX + nodeSize, height=maxY - minY + nodeSize}
 
 {-| scale the layout to fit the new dimensions, assuming the layout is centered at (0,0) -}
-fitLayout : Float -> Float -> GraphLayout -> GraphLayout
-fitLayout w h layout =
-  let {width, height} = layoutDimensions layout
-      scaleX = w / width 
-      scaleY = h / height 
-  in scaleLayout scaleX scaleY layout
+-- fitLayout : Float -> Float -> GraphLayout -> GraphLayout
+-- fitLayout w h layout =
+--   let {width, height} = layoutDimensions layout
+--       scaleX = w / width 
+--       scaleY = h / height 
+--   in scaleLayout scaleX scaleY layout
 
-scaleLayout : Float -> Float -> GraphLayout -> GraphLayout
-scaleLayout sx sy =
-  let scale n = {n | x=n.x * sx, y=n.y * sy}
-  in Graph.mapNodes scale
+-- scaleLayout : Float -> Float -> GraphLayout -> GraphLayout
+-- scaleLayout sx sy =
+--   let scale n = {n | x=n.x * sx, y=n.y * sy}
+--   in Graph.mapNodes scale
 
 translateLayout : Float -> Float -> GraphLayout -> GraphLayout
 translateLayout dx dy =
   let translate n = {n | x=n.x + dx, y=n.y + dy}
   in Graph.mapNodes translate
-
--- avgOfLayout : GraphLayout -> Vec2
--- avgOfLayout layout =
---   let sum = List.foldl (.pos >> V.add) (V.vec2 0 0) (Dict.values layout)
---       n = Dict.size layout
---   in V.scale (1 / toFloat n) sum
-
--- centerLayout : Vec2 -> GraphLayout -> GraphLayout
--- centerLayout center layout =
---   let avg = avgOfLayout layout
---       diff = V.sub center avg
---   in translateLayout diff layout
 
 drawMachine : G.GMachine -> GraphLayout -> Svg msg
 drawMachine machine layout =
