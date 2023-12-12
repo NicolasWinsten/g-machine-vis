@@ -9,9 +9,6 @@ import Element.Border as Border
 import Colors.Opaque as Color
 import Color as C
 import GMachine as G
-import Dagre as D
-import Dagre.Attributes as DA
-import Render as R
 import Render.StandardDrawers as RSD
 import Render.StandardDrawers.Attributes as RSDA
 import Render.StandardDrawers.Types as RSDT
@@ -20,74 +17,198 @@ import TypedSvg as Svg
 import TypedSvg.Attributes as SvgA
 import TypedSvg.Types as SvgT
 import Result.Extra
-import Basics.Extra exposing (flip)
+import Basics.Extra exposing (flip, atMost)
 import Backend
-import Graph
-import Dict
+import Dict exposing (Dict)
 import Html.Attributes
-import Html
 import Browser.Events exposing (onResize)
 import Task
 import Browser.Dom exposing (getViewport)
 import ZipList exposing (ZipList, ZipList(..))
+import Force
+import Dict.Extra
+import Monocle.Optional as Optional exposing (Optional)
+import Monocle.Lens as Lens exposing (Lens)
+import Math.Vector2 as V exposing (Vec2)
+import Maybe.Extra
+import Graph exposing (Graph)
+import IntDict
 
-type MachineViewState
-  = StaticView G.RuntimeResult
-  | FailedToCompile Backend.CompilerError
-  -- | TransitioningLayout {oldLayout : (), machine : G.GMachine}
-  | Uninitialized
+
+type alias NodeEntity = Force.Entity G.HeapAddr { value : G.GNode }
+
+type Side = Left | Right
+
+type alias Edge = Graph.Edge Side
+
+type alias Node = Graph.Node NodeEntity
+
+type alias GraphLayout = Graph NodeEntity Side
+
+type alias MachineView =
+  { runtime : G.RuntimeResult, layout : GraphLayout, forceSim : Force.State G.HeapAddr }
+
+type ProgramView = Uninitialized | Running MachineView | CompilationError Backend.CompilerError
+
+type alias ViewPort = {width : Int, height : Int}
 
 type alias Model =
   { sourceCode : String
-  , machine : MachineViewState
-  , viewport : {width : Int, height : Int}
+  , program : ProgramView
+  , viewport : ViewPort
   }
-
-setMachineState : MachineViewState -> Model -> Model
-setMachineState state model = { model | machine=state }
 
 type Msg
   = ClickedCompile
   | ChangedSourceCode String
   | ClickedStep
   | WindowResized Int Int
+  | AnimationFrame
+
+runtimeResultToGMachine : Lens G.RuntimeResult G.GMachine
+runtimeResultToGMachine = Lens Tuple.first (\m (_, u) -> (m,u))
+
+machineViewToRuntimeResult : Lens MachineView G.RuntimeResult
+machineViewToRuntimeResult = Lens .runtime (\r m -> {m | runtime=r})
+
+accessLayout : Lens MachineView GraphLayout
+accessLayout = Lens .layout (\l m -> {m | layout=l})
+
+accessProgram : Lens Model ProgramView
+accessProgram = Lens .program (\p m -> {m | program=p})
+
+programToMachineView : Optional ProgramView MachineView
+programToMachineView = Optional
+  (\p -> case p of
+    Running m -> Just m
+    _ -> Nothing
+  )
+  (\m _ -> Running m)
+
+accessMachineView : Optional Model MachineView
+accessMachineView = Optional.compose (Optional.fromLens accessProgram) programToMachineView
+
+accessGMachine : Lens MachineView G.GMachine
+accessGMachine = Lens.compose machineViewToRuntimeResult runtimeResultToGMachine
+
+insertNode : G.HeapAddr -> G.GNode -> GraphLayout -> GraphLayout
+insertNode id node =
+  let edges = case G.getChildren node of
+        Just (left, right) -> IntDict.fromList [(left, Left), (right, Right)]
+        Nothing -> IntDict.empty
+      
+      nodeEntity : Node
+      nodeEntity = {id=id, label=Force.entity id node}
+  in Graph.insert
+    { node=nodeEntity
+    , incoming=IntDict.empty
+    , outgoing=edges
+    }
+
+deleteNodeFromLayout : G.HeapAddr -> GraphLayout -> GraphLayout
+deleteNodeFromLayout = Graph.remove
+
+makeForceSim : GraphLayout -> Force.State G.HeapAddr
+makeForceSim layout =
+  let edges = List.map (\{from, to} -> (from, to)) (Graph.edges layout)
+  in Force.iterations 1000
+  <| Force.simulation
+  [ Force.manyBodyStrength (-5) (Graph.nodeIds layout)
+  , Force.links edges
+  , Force.center 0 0
+  ]
+
+resetForceSim : MachineView -> MachineView
+resetForceSim mview = {mview | forceSim=makeForceSim mview.layout} 
+
+tickForceSim : MachineView -> MachineView
+tickForceSim mview =
+  let entities = List.map .label (Graph.nodes mview.layout)
+      (newSim, newEntities) = Force.tick mview.forceSim entities
+
+      setLabel l ctx = {ctx | node={id=l.id, label=l}}
+      newLayout = List.foldl
+        (\entity -> Graph.update entity.id (Maybe.map (setLabel entity)))
+        mview.layout
+        newEntities
+  in {mview | layout=newLayout, forceSim=newSim}
+
+updateMachineView : G.MachineUpdate -> MachineView -> MachineView
+updateMachineView machineUpdate = case machineUpdate of
+  G.NewNodeAllocated id node ->
+    Lens.modify accessLayout (insertNode id node)
+    >> resetForceSim
+
+  G.HolesAllocated holeNodeIds -> Lens.modify accessLayout
+    (\layout -> List.foldl (flip insertNode G.GHole) layout holeNodeIds)
+    >> resetForceSim
+
+  G.Multiple update1 update2 -> updateMachineView update1 >> updateMachineView update2
+
+  G.Crash _ -> identity
+
+  G.Output _ -> identity
+
+  G.GarbageCollection refs -> Lens.modify accessLayout
+    (\layout -> List.foldl deleteNodeFromLayout layout refs)
+    >> resetForceSim
+
+  G.EnteredCode function -> identity
+
+  G.Unwound id -> identity
+
+  G.RedexRootReplaced id node -> Lens.modify accessLayout (insertNode id node)
+
+  G.NoUpdate -> identity
+
+
+initializeMachineView : G.RuntimeResult -> MachineView
+initializeMachineView ((machine, machineUpdate) as result) =
+  updateMachineView machineUpdate (MachineView result Graph.empty (makeForceSim Graph.empty))
+
+
+stepMachineView : MachineView -> MachineView
+stepMachineView mview =
+  if G.isTermination (Tuple.second mview.runtime)
+  then mview
+  else let result = G.step (accessGMachine.get mview)
+  in mview
+  |> machineViewToRuntimeResult.set result
+  |> updateMachineView (Tuple.second result)
 
 
 initialProgram =
   """
-min x y = x - y
-double x = x + x
-
-main = double (min 10 3)
+min x y = x-y
+double x=x+x
+main = 3 - 1 - 3
 """
 
-compileSourceCode : Model -> Model
-compileSourceCode model = Result.Extra.unpack
-    (\err -> setMachineState (FailedToCompile err) model)
-    (\compiledMachine -> setMachineState (StaticView <| G.Running compiledMachine) model)
-    (G.createMachine model.sourceCode)
+compileSourceCode : String -> Model -> Model
+compileSourceCode sourceCode = Result.Extra.unpack
+    (CompilationError >> accessProgram.set)
+    (initializeMachineView >> Running >> accessProgram.set)
+    (G.createMachine sourceCode)
 
 init =
-  ( compileSourceCode {sourceCode=initialProgram, machine=Uninitialized, viewport={width=0,height=0}}
+  ( compileSourceCode initialProgram
+    {sourceCode=initialProgram, program=Uninitialized, viewport={width=0,height=0}}
   , Task.perform
     (\{viewport} -> WindowResized (round viewport.width) (round viewport.height))
     getViewport
   )
 
-
-
+update : Msg -> Model -> (Model, Cmd msg )
 update msg model = case msg of
-  ClickedCompile -> (compileSourceCode model, Cmd.none)
+  ClickedCompile -> (compileSourceCode model.sourceCode model, Cmd.none)
 
   ChangedSourceCode src -> ({model | sourceCode=src}, Cmd.none)
 
-  ClickedStep -> case model.machine of
-    StaticView machine -> case machine of
-      G.Running gmachine -> (setMachineState (StaticView <| G.step gmachine) model, Cmd.none)
-      _ -> (model, Cmd.none)
-    _ -> (model, Cmd.none)
+  ClickedStep -> (Optional.modify accessMachineView stepMachineView model, Cmd.none)
   
   WindowResized w h -> ({ model | viewport={width=w, height=h}}, Cmd.none)
+
+  AnimationFrame -> (Optional.modify accessMachineView tickForceSim model, Cmd.none)
 
 disabledButtonStyle =
   [ Border.color Color.grey
@@ -123,9 +244,6 @@ stepButton = EI.button buttonStyle
 fillWidth = E.width E.fill
 fillHeight = E.height E.fill
 
-{-| 
-
--}
 sourceCodeTextArea src = EI.multiline
   [fillHeight, fillWidth]
   { onChange = ChangedSourceCode
@@ -136,105 +254,105 @@ sourceCodeTextArea src = EI.multiline
   }
   |> E.el [E.scrollbarY, fillHeight, fillWidth]
 
-getNodes : G.GGraph -> List (Graph.Node G.GNode)
-getNodes = Dict.toList >> List.map (\(id, node) -> {id=id, label=node})
 
-getEdges : G.GGraph -> List (Graph.Edge ())
-getEdges graph = Dict.toList graph
-  |> List.concatMap (\(id, node) -> case G.getChildren node of
-    Just (left, right) -> [{from=id, to=left, label=()}, {from=id, to=right, label=()}]
-    Nothing -> []
-  )
+nodeSize = 5
 
-runLayout : G.GGraph -> D.GraphLayout
-runLayout graph =
-  let nodes = getNodes graph
-      edges = getEdges graph
-  in D.runLayout
-    [DA.nodeSep 15, DA.width 5, DA.height 5, DA.rankSep 15]
-    (Graph.fromNodesAndEdges nodes edges)
+nodeData : Node -> G.GNode
+nodeData = .label >> .value
 
-nodeLabel : Graph.Node G.GNode -> String
-nodeLabel node = case node.label of
+nodeLabelString : G.GNode -> String
+nodeLabelString node = case node of
   G.GFunc {name} -> name
   G.GApp _ _ -> "@"
   G.GHole -> "■"
   G.GInt x -> String.fromInt x
 
 
-nodeShape : Graph.Node G.GNode -> RSDT.Shape
-nodeShape node = case node.label of
+nodeShape : G.GNode -> RSDT.Shape
+nodeShape node = case node of
   G.GHole -> RSDT.RoundedBox 1
   _ -> RSDT.NoShape
 
+-- TODO have font size get smaller as the layout gets bigger
+drawNode : Node -> Svg msg
+drawNode ({label} as node) = RSD.svgDrawNode
+    [ RSDA.label (nodeData >> nodeLabelString), RSDA.fontSize nodeSize, RSDA.shape (nodeData >> nodeShape) ]
+    { node=node, coord=(label.x,label.y), width=nodeSize, height=nodeSize}
 
-drawNode : Graph.Node G.GNode -> D.GraphLayout -> Svg msg
-drawNode node layout = case Dict.get node.id layout.coordDict of
-  Just coord -> RSD.svgDrawNode
-    [ RSDA.label nodeLabel, RSDA.fontSize 5, RSDA.shape nodeShape ]
-    { node=node, coord=coord, width=5, height=5}
-  Nothing -> Svg.text_ [] [TypedSvg.Core.text "failed to draw node"]
-
-drawEdge : Graph.Edge () -> D.GraphLayout -> Svg msg
-drawEdge e {coordDict, controlPtsDict} =
-  let sourceCoords = Dict.get e.from coordDict
-      targetCoords = Dict.get e.to coordDict
-      ctrlPts = Dict.get (e.from, e.to) controlPtsDict
-        |> Maybe.map (List.filterMap (flip Dict.get coordDict))
-  in case (sourceCoords, targetCoords, ctrlPts) of
-    (Just source, Just target, Just controlPts) -> RSD.svgDrawEdge
+-- TODO scale down the arrow stroke width as layout scales
+drawEdge : Edge -> GraphLayout -> Svg msg
+drawEdge ({from, to} as e) layout =
+  let sourceCoords = Graph.get from layout |> Maybe.map (.node >> .label)
+      targetCoords = Graph.get to layout |> Maybe.map (.node >> .label)
+  in case (sourceCoords, targetCoords) of
+    (Just source, Just target) -> RSD.svgDrawEdge
       [ RSDA.arrowHead RSDT.Vee, RSDA.linkStyle RSDT.Spline
       , RSDA.strokeWidth (always 0.5), RSDA.strokeColor (always C.black)
       ]
-      {edge=e, source=source, target=target, controlPts=controlPts, sourceDimensions=(5,5), targetDimensions=(5,5)}
+      { edge=e
+      , source=(source.x, source.y), target=(target.x, target.y)
+      , controlPts=[], sourceDimensions=(nodeSize,nodeSize), targetDimensions=(nodeSize,nodeSize)
+      }
     _ -> Svg.text_ [] [TypedSvg.Core.text "failed to draw edge"]
 
-drawGraph : G.GGraph -> D.GraphLayout -> Svg msg
-drawGraph g layout =
-  let nodes = List.map (flip drawNode layout) (getNodes g)
-      edges = List.map (flip drawEdge layout) (getEdges g)
+drawGraph : GraphLayout -> Svg msg
+drawGraph layout =
+  let nodes = List.map drawNode (Graph.nodes layout)
+      edges = List.map (flip drawEdge layout) (Graph.edges layout)
   in Svg.g [] (edges ++ nodes)
 
-{-| flip the layout horizontally across its barycenter -}
-flipLayout : D.GraphLayout -> D.GraphLayout
-flipLayout layout =
-  let sumOfXCoords = Dict.values layout.coordDict
-        |> List.map Tuple.first
-        |> List.sum
-      
-      numNodes = Dict.size layout.coordDict
-      avg = sumOfXCoords / toFloat numNodes
+layoutDimensions : GraphLayout -> {width : Float, height : Float}
+layoutDimensions layout =
+  let entities = Graph.nodes layout
+      xvals = List.map (.label >> .x) entities
+      yvals = List.map (.label >> .x) entities
+      min = List.minimum >> Maybe.withDefault 0
+      max = List.maximum >> Maybe.withDefault 0
+      (maxX, minX) = (max xvals, min xvals)
+      (maxY, minY) = (max yvals, min yvals)
+  in {width=maxX - minX + nodeSize, height=maxY - minY + nodeSize}
 
-      flipCoordAcrossAvg (x, y) = (2 * avg - x, y)
-  in { layout | coordDict=Dict.map (always flipCoordAcrossAvg) layout.coordDict}
-
-{-| scale the layout to fit the new dimensions -}
-fitLayout : Float -> Float -> D.GraphLayout -> D.GraphLayout
+{-| scale the layout to fit the new dimensions, assuming the layout is centered at (0,0) -}
+fitLayout : Float -> Float -> GraphLayout -> GraphLayout
 fitLayout w h layout =
-  let
-      scaleX = w / layout.width
-      scaleY = h / layout.height
-      scale (x_, y_) = (scaleX * x_, scaleY * y_)
-  in { layout
-    | width=w
-    , height=h
-    , coordDict=Dict.map (always scale) layout.coordDict
-    }
+  let {width, height} = layoutDimensions layout
+      scaleX = w / width 
+      scaleY = h / height 
+  in scaleLayout scaleX scaleY layout
 
-translateLayout : Float -> Float -> D.GraphLayout -> D.GraphLayout
-translateLayout dx dy layout =
-  { layout | coordDict=Dict.map (\_ (x,y) -> (x + dx, y + dy)) layout.coordDict }
+scaleLayout : Float -> Float -> GraphLayout -> GraphLayout
+scaleLayout sx sy =
+  let scale n = {n | x=n.x * sx, y=n.y * sy}
+  in Graph.mapNodes scale
 
-drawMachine : G.GMachine -> Svg msg
-drawMachine machine =
+translateLayout : Float -> Float -> GraphLayout -> GraphLayout
+translateLayout dx dy =
+  let translate n = {n | x=n.x + dx, y=n.y + dy}
+  in Graph.mapNodes translate
+
+-- avgOfLayout : GraphLayout -> Vec2
+-- avgOfLayout layout =
+--   let sum = List.foldl (.pos >> V.add) (V.vec2 0 0) (Dict.values layout)
+--       n = Dict.size layout
+--   in V.scale (1 / toFloat n) sum
+
+-- centerLayout : Vec2 -> GraphLayout -> GraphLayout
+-- centerLayout center layout =
+--   let avg = avgOfLayout layout
+--       diff = V.sub center avg
+--   in translateLayout diff layout
+
+drawMachine : G.GMachine -> GraphLayout -> Svg msg
+drawMachine machine layout =
   let
-    width = 100
-    height = 100
+    width = 500
+    height = 500
     stackWidthPct = 0.15 -- pct of width to be taken up by stack
-    layout = runLayout machine.graph
-        |> flipLayout
-        |> fitLayout ((1 - stackWidthPct) * width) height
-        |> translateLayout (stackWidthPct * width) 0
+
+    graphWidth = ((1 - stackWidthPct) * width)
+    layout_ = layout
+        -- |> fitLayout graphWidth height
+        |> translateLayout (width/2) (height/2)
 
   in Svg.svg
     [ SvgA.viewBox 0 0 width height
@@ -242,8 +360,8 @@ drawMachine machine =
     , Html.Attributes.style "width" "100%"
     , Html.Attributes.style "border" "solid"
     ]
-    [ drawGraph machine.graph layout
-    , drawStack machine layout (stackWidthPct * width)
+    [ drawGraph layout_
+    , drawStack machine layout_ (stackWidthPct * width)
     ]
 
 
@@ -268,44 +386,45 @@ drawPointer {source, target, agletLength} =
       ]
       {edge=dummyEdge, source=source, target=target
       , controlPts=[(Tuple.first source + agletLength, Tuple.second source)]
-      , sourceDimensions=(0,0), targetDimensions=(5,5)
+      , sourceDimensions=(0,0), targetDimensions=(nodeSize, nodeSize)
       }
 
-drawStack : G.GMachine -> D.GraphLayout -> Float -> Svg msg
-drawStack machine {coordDict} cellWidth =
+drawStack : G.GMachine -> GraphLayout -> Float -> Svg msg
+drawStack machine layout cellWidth =
   let
     cellHeight = cellWidth * 0.5
-    cells = List.indexedMap (\i nodeid -> case Dict.get nodeid coordDict of
-        Just (nodeX,nodeY) ->
+    cells = List.indexedMap (\i nodeid -> case Graph.get nodeid layout of
+        Just {node} ->
           [ drawCell 0 (cellHeight * toFloat i) cellWidth cellHeight
           , drawPointer
             { source=(0 + cellWidth/2, cellHeight * toFloat i + cellHeight/2)
-            , target=(nodeX, nodeY)
+            , target=(node.label.x, node.label.y)
             , agletLength=5
             }
           ]
         Nothing -> [Svg.text_ [] [TypedSvg.Core.text "Failure drawing cell"]]
       )
-      (List.reverse <| G.getStack machine)
+      (List.reverse (G.getStack machine))
       |> List.concat
   in Svg.g [] cells
 
--- TODO remove this function
-drawTerminatedMachine : G.HeapAddr -> G.GGraph -> Svg msg
-drawTerminatedMachine node graph =
-  let layout = flipLayout <| runLayout graph
-  in Svg.svg [SvgA.viewBox 0 0 layout.width layout.height] [drawGraph graph layout]
 
-viewMachine : MachineViewState -> E.Element msg
-viewMachine machine = case machine of
-  StaticView (G.Running gmachine) -> E.html (drawMachine gmachine)
-  StaticView (G.Terminated nodeId graph) -> 
-    drawTerminatedMachine nodeId graph
-    |> E.html
-  StaticView (G.Crash err) -> E.text "runtime error"
-  FailedToCompile err -> E.text "failed to compile"
-  Uninitialized -> E.text "Write your program and click compile!"
-  
+viewMachine : MachineView -> E.Element msg
+viewMachine {runtime, layout} =
+  let (machine, machineUpdate) = runtime
+  in E.html (drawMachine machine layout)
+
+viewProgram : ViewPort -> ProgramView -> E.Element msg
+viewProgram viewport program = case program of
+  Running machineView ->
+    let code = (accessGMachine.get >> G.getCodePtr) machineView
+    in E.row [fillHeight, fillWidth]
+      [ E.el [fillHeight, E.width (E.fillPortion 2)] (viewCode code)
+      , E.el [E.width (E.fillPortion 5), E.height (E.maximum viewport.height E.fill)] (viewMachine machineView)
+      ]
+  CompilationError err -> E.text "compilation error"
+  Uninitialized -> E.text "Write a program on the left window and hit compile"
+
 viewCode : ZipList Backend.GCode -> E.Element msg
 viewCode (Zipper past current rest) =
   let toText = Backend.gCodeToString >> E.text
@@ -315,21 +434,31 @@ viewCode (Zipper past current rest) =
     ++ List.map toText rest 
 
 view : Model -> E.Element Msg
-view {sourceCode, machine, viewport} =
+view {sourceCode, program, viewport} =
     E.row [fillWidth, fillHeight, Font.family [Font.monospace]]
     [ E.column [E.width (E.fillPortion 2), fillHeight, E.explain Debug.todo]
         [ sourceCodeTextArea sourceCode
         , E.row [] [compileButton, stepButton]
         ]
-    , case machine of
-        StaticView (G.Running m) -> E.el [E.width (E.fillPortion 2), fillHeight] (viewCode (G.getCodePtr m))
-        _ -> E.none
-    , E.el [E.width (E.fillPortion 5), E.height (E.maximum viewport.height E.fill), E.explain Debug.todo]
-      (viewMachine machine) 
+    , E.el [E.width (E.fillPortion 5), fillHeight, E.explain Debug.todo]
+      (viewProgram viewport program) 
     ]
 
 subscriptions : Model -> Sub Msg
-subscriptions model = onResize WindowResized
+subscriptions model =
+  let forceSim = model
+        |> accessMachineView.getOption
+        |> Maybe.map .forceSim
+  
+      forceSimRunning = forceSim
+        |> Maybe.map (not << Force.isCompleted)
+        |> Maybe.withDefault False
+
+      tick =
+        if forceSimRunning
+        then Browser.Events.onAnimationFrame (always AnimationFrame)
+        else Sub.none
+  in Sub.batch [onResize WindowResized, tick]
 
 main : Program () Model Msg
 main = Browser.element

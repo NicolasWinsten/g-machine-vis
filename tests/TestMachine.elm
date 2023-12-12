@@ -23,11 +23,11 @@ global name numFormals code = Global name numFormals
 
 expectOutput : TestOutput -> GMachine -> Expectation
 expectOutput expected machine = case runMachine machine of
-    Ok (nodeId, graph) -> case (expected, Dict.get nodeId graph) of
+    ({graph}, Output val) -> case (expected, Dict.get val graph) of
         (TFunc expectedFunc, Just (GFunc {name})) -> Expect.equal expectedFunc name
         (TInt expectedInt, Just (GInt actualInt)) -> Expect.equal expectedInt actualInt
         (_, actualResult) -> Expect.fail ("actual result is " ++ Debug.toString actualResult)
-    Err runtimeErr -> Expect.fail (Debug.toString runtimeErr)
+    (_, outcome) -> Expect.fail (Debug.toString outcome)
 
 
 testParse : String -> List SuperCombinator -> Test
@@ -41,7 +41,7 @@ testCompilationToGCode source expectedGCodes = test ("compile result of " ++ sou
 testRun : String -> TestOutput -> Test
 testRun source expectedOutput = test ("runtime result of " ++ source)
     (\_ -> case createMachine source of
-        Ok machine -> expectOutput expectedOutput machine
+        Ok (machine, _) -> expectOutput expectedOutput machine
         Err _ -> Expect.fail "failed to compile"
     )
 
