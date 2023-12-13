@@ -46,7 +46,12 @@ type alias Node = Graph.Node NodeEntity
 type alias GraphLayout = Graph NodeEntity Side
 
 type alias MachineView =
-  { runtime : G.RuntimeResult, layout : GraphLayout, forceSim : Force.State G.HeapAddr }
+  { runtime : G.RuntimeResult
+  , layout : GraphLayout
+  , forceSim : Force.State G.HeapAddr
+  , spineTip : Maybe G.HeapAddr
+  , spineRoot : Maybe G.HeapAddr
+  }
 
 type ProgramView = Uninitialized | Running MachineView | CompilationError Backend.CompilerError
 
@@ -91,65 +96,108 @@ accessMachineView = Optional.compose (Optional.fromLens accessProgram) programTo
 accessGMachine : Lens MachineView G.GMachine
 accessGMachine = Lens.compose machineViewToRuntimeResult runtimeResultToGMachine
 
-insertNode : G.HeapAddr -> G.GNode -> GraphLayout -> GraphLayout
+setSpineTip : Maybe G.HeapAddr -> MachineView -> MachineView
+setSpineTip spineTip mv = {mv | spineTip=spineTip}
+
+setSpineRoot : Maybe G.HeapAddr -> MachineView -> MachineView
+setSpineRoot spineRoot mv = {mv | spineRoot=spineRoot} 
+
+when : Bool -> (a -> a) -> a -> a
+when cond f x = if cond then f x else x
+
+getOutgoing : G.GNode -> Graph.Adjacency Side
+getOutgoing node = case G.getChildren node of
+  Just (left, right) -> IntDict.fromList [(left, Left), (right, Right)]
+  Nothing -> IntDict.empty
+
+insertNode : G.HeapAddr -> G.GNode -> MachineView -> MachineView
 insertNode id node =
-  let edges = case G.getChildren node of
-        Just (left, right) -> IntDict.fromList [(left, Left), (right, Right)]
-        Nothing -> IntDict.empty
-      
+  let edges = getOutgoing node
       nodeEntity : Node
       nodeEntity = {id=id, label=Force.entity id node}
-  in Graph.insert
+  in Lens.modify accessLayout
+  ( Graph.insert
     { node=nodeEntity
     , incoming=IntDict.empty
     , outgoing=edges
     }
+  )
+  >> resetForceSim
 
-deleteNodeFromLayout : G.HeapAddr -> GraphLayout -> GraphLayout
-deleteNodeFromLayout = Graph.remove
+deleteNodeFromLayout : G.HeapAddr -> MachineView -> MachineView
+deleteNodeFromLayout id ({spineRoot, spineTip} as mv) = mv
+  |> Lens.modify accessLayout (Graph.remove id)
+  |> when (spineRoot == Just id) (setSpineRoot Nothing)
+  |> when (spineTip == Just id) (setSpineTip Nothing)
+  |> resetForceSim
 
-makeForceSim : GraphLayout -> Force.State G.HeapAddr
-makeForceSim layout =
+makeForceSim : MachineView -> Force.State G.HeapAddr
+makeForceSim {layout, spineTip, spineRoot} =
   let edges = List.map (\{from, to} -> (from, to)) (Graph.edges layout)
+
+      -- leftMost = List.map (.label >> .x) (Graph.nodes layout)
+      --   |> List.minimum
+      
+      -- bottomMost = List.map (.label >> .y) (Graph.nodes layout)
+      --   |> List.maximum
+      
+      {width, height} = layoutDimensions layout
+
+      spinePullStrength = 0.05
+
+      -- pull on either ends of the spine to align it on the diagonal
+      pullSpine = Maybe.map2
+        (\rootId tipId ->
+          [ Force.towardsX
+            [ {node=rootId, target=width, strength=spinePullStrength}
+            , {node=tipId, target=-width, strength=spinePullStrength}
+            ]
+          , Force.towardsY
+            [ {node=rootId, target=-height, strength=spinePullStrength}
+            , {node=tipId, target=height, strength=spinePullStrength}
+            ]
+          ]
+        )
+        spineRoot
+        spineTip
+        |> Maybe.withDefault []
 
       -- gravitate all nodes towards center to mitigate fly away
       gravitateNodes = List.map
         (\id -> {node=id, strength=0.01, target=0})
         (Graph.nodeIds layout)
 
-  in Force.iterations 1000
-  <| Force.simulation
+  in
+  -- Force.iterations 1000 <|
+  Force.simulation <|
   [ Force.manyBody (Graph.nodeIds layout)
   , Force.links edges
   , Force.center 0 0
   , Force.towardsX gravitateNodes
   , Force.towardsY gravitateNodes
-  ]
+  ] ++ pullSpine
 
 resetForceSim : MachineView -> MachineView
-resetForceSim mview = {mview | forceSim=makeForceSim mview.layout} 
+resetForceSim mview = {mview | forceSim=makeForceSim mview}
 
 tickForceSim : MachineView -> MachineView
-tickForceSim mview =
-  let entities = List.map .label (Graph.nodes mview.layout)
-      (newSim, newEntities) = Force.tick mview.forceSim entities
+tickForceSim ({layout, spineRoot, forceSim} as mview) =
+  let entities = List.map .label (Graph.nodes layout)
+      (newSim, newEntities) = Force.tick forceSim entities
 
       setLabel l ctx = {ctx | node={id=l.id, label=l}}
       newLayout = List.foldl
         (\entity -> Graph.update entity.id (Maybe.map (setLabel entity)))
-        mview.layout
+        layout
         newEntities
+      
   in {mview | layout=newLayout, forceSim=newSim}
 
 updateMachineView : G.MachineUpdate -> MachineView -> MachineView
 updateMachineView machineUpdate = case machineUpdate of
-  G.NewNodeAllocated id node ->
-    Lens.modify accessLayout (insertNode id node)
-    >> resetForceSim
+  G.NewNodeAllocated id node -> insertNode id node
 
-  G.HolesAllocated holeNodeIds -> Lens.modify accessLayout
-    (\layout -> List.foldl (flip insertNode G.GHole) layout holeNodeIds)
-    >> resetForceSim
+  G.HolesAllocated holeNodeIds -> (\mv -> List.foldl (flip insertNode G.GHole) mv holeNodeIds)
 
   G.Multiple update1 update2 -> updateMachineView update1 >> updateMachineView update2
 
@@ -157,22 +205,31 @@ updateMachineView machineUpdate = case machineUpdate of
 
   G.Output _ -> identity
 
-  G.GarbageCollection refs -> Lens.modify accessLayout
-    (\layout -> List.foldl deleteNodeFromLayout layout refs)
-    >> resetForceSim
+  G.GarbageCollection refs -> (\mv -> List.foldl deleteNodeFromLayout mv refs)
 
   G.EnteredCode function -> identity
 
-  G.Unwound id -> identity
+  G.StartedUnwind id -> setSpineRoot (Just id)
 
-  G.RedexRootReplaced id node -> Lens.modify accessLayout (insertNode id node)
+  G.Unwound id -> setSpineTip (Just id) >> resetForceSim
+
+  G.RedexRootReplaced id reduct ->
+    let outgoing = getOutgoing reduct
+        setValue ({label} as n) = {n | label={label | value=reduct}}
+        updateCtx ctx = {ctx | outgoing=outgoing, node=setValue ctx.node}
+    in Lens.modify accessLayout
+    (Graph.update id (Maybe.map updateCtx))
+    >> resetForceSim
 
   G.NoUpdate -> identity
 
 
 initializeMachineView : G.RuntimeResult -> MachineView
 initializeMachineView ((machine, machineUpdate) as result) =
-  updateMachineView machineUpdate (MachineView result Graph.empty (makeForceSim Graph.empty))
+  updateMachineView machineUpdate
+  { runtime=result, layout=Graph.empty, forceSim=Force.simulation []
+  , spineTip=Nothing, spineRoot=Nothing
+  }
 
 
 stepMachineView : MachineView -> MachineView

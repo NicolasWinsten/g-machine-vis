@@ -80,6 +80,7 @@ type MachineUpdate
   | Output HeapAddr
   | GarbageCollection (List HeapAddr)
   | EnteredCode {functionAddr : HeapAddr, function : Global, args : List HeapAddr}
+  | StartedUnwind HeapAddr
   | Unwound HeapAddr -- add force to pull this node to the bottom left
   | RedexRootReplaced HeapAddr GNode
   | Multiple MachineUpdate MachineUpdate
@@ -209,7 +210,7 @@ andThen procedure (machine, previousUpdate) =
 startUnwind : GMachine -> RuntimeResult
 startUnwind gmachine =
   let newMachine = Lens.modify accessCtx (accessStack.get >> Unwinding) gmachine
-  in runWith getTopVal (Unwound >> flip Tuple.pair) newMachine
+  in runWith getTopVal (StartedUnwind >> flip Tuple.pair) newMachine
 
 
 getRightChild : GNode -> Maybe HeapAddr
