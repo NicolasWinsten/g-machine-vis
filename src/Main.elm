@@ -35,6 +35,7 @@ import Set exposing (Set)
 import Graph
 import Hierarchy
 import Tree exposing (children)
+import Math.Vector2 as Vec
 
 {-| each node in the graph's heap will be given an entity in a force simulation
 to track position and velocity
@@ -360,29 +361,82 @@ sourceCodeTextArea src = EI.multiline
   |> E.el [E.scrollbarY, fillHeight, fillWidth]
 
 
+edgeDirection : Edge -> GraphLayout -> Maybe Vec.Vec2
+edgeDirection {from, to} layout = Maybe.map2
+  (\u v ->
+    let sourceVec = Vec.vec2 u.x u.y
+        targetVec = Vec.vec2 v.x v.y
+    in Vec.direction targetVec sourceVec
+  )
+  (getEntity from layout)
+  (getEntity to layout)
+
+getIncomingEdges : G.HeapAddr -> GraphLayout -> List Edge
+getIncomingEdges id layout = case Graph.get id layout of
+  Just {incoming} -> List.map (\(p, side) -> {from=p, to=id, label=side}) (IntDict.toList incoming)
+  Nothing -> []
+
+{-| for nodes with longer names (function nodes),
+compute the rotation of the displayed label by taking the average of incoming edge angles
+-}
+avgDirOfIncomingEdges : G.HeapAddr -> GraphLayout -> {x : Float, y : Float}
+avgDirOfIncomingEdges id layout =
+  let directions = List.filterMap
+        (\e -> edgeDirection e layout)
+        (getIncomingEdges id layout)
+      
+      avgDir = List.foldl Vec.add (Vec.vec2 0 0) directions
+        |> Vec.scale (1 / toFloat (List.length directions))
+  in Vec.toRecord avgDir
+
+
 nodeSize = 5
 
 nodeData : Node -> G.GNode
 nodeData = .label >> .value
 
-nodeLabelString : G.GNode -> String
-nodeLabelString node = case node of
+nodeLabelString : Node -> String
+nodeLabelString node = case nodeData node of
   G.GFunc {name} -> name
   G.GApp _ _ -> "@"
   G.GHole -> "■"
   G.GInt x -> String.fromInt x
 
+nodeLabelAngle : Node -> GraphLayout -> Float
+nodeLabelAngle node layout =
+  let dir = avgDirOfIncomingEdges node.id layout
+      pointingLeft = dir.x < 0
+      angle = atan2 dir.y dir.x
+  in case nodeData node of
+  G.GFunc _ -> if pointingLeft then angle + pi else angle
+  _ -> 0
 
-nodeShape : G.GNode -> RSDT.Shape
-nodeShape node = case node of
-  G.GHole -> RSDT.RoundedBox 1
-  _ -> RSDT.NoShape
+nodeLabelAnchor : Node -> GraphLayout -> SvgT.AnchorAlignment
+nodeLabelAnchor node layout =
+  let numIncomingEdges = List.length (getIncomingEdges node.id layout)
+      dir = avgDirOfIncomingEdges node.id layout
+      pointingLeft = dir.x < 0
+  in case nodeData node of
+  G.GFunc _ ->
+    if numIncomingEdges == 0 then SvgT.AnchorMiddle
+    else if pointingLeft then SvgT.AnchorEnd
+    else SvgT.AnchorStart
+  _ -> SvgT.AnchorMiddle
 
 -- TODO have font size get smaller as the layout gets bigger
-drawNode : Node -> Svg msg
-drawNode ({label} as node) = RSD.svgDrawNode
-    [ RSDA.label (nodeData >> nodeLabelString), RSDA.fontSize nodeSize, RSDA.shape (nodeData >> nodeShape) ]
-    { node=node, coord=(label.x,label.y), width=nodeSize, height=nodeSize}
+drawNode : Node -> GraphLayout -> Svg msg
+drawNode node layout =
+  let {x,y} = nodeToEntity.get node
+      labelRot = nodeLabelAngle node layout * 180 / pi
+  in Svg.text_
+  [ SvgA.x (SvgT.Px x)
+  , SvgA.y (SvgT.Px y)
+  , SvgA.fontSize (SvgT.Px nodeSize)
+  , SvgA.transform [SvgT.Rotate labelRot x y]
+  , SvgA.textAnchor (nodeLabelAnchor node layout)
+  , SvgA.dominantBaseline SvgT.DominantBaselineMiddle
+  ]
+  [TypedSvg.Core.text (nodeLabelString node)]
 
 -- TODO scale down the arrow stroke width as layout scales
 drawEdge : Edge -> GraphLayout -> Svg msg
@@ -402,7 +456,7 @@ drawEdge ({from, to} as e) layout =
 
 drawGraph : GraphLayout -> Svg msg
 drawGraph layout =
-  let nodes = List.map drawNode (Graph.nodes layout)
+  let nodes = List.map (flip drawNode layout) (Graph.nodes layout)
       edges = List.map (flip drawEdge layout) (Graph.edges layout)
   in Svg.g [] (edges ++ nodes)
 
