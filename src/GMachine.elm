@@ -5,7 +5,7 @@ module GMachine exposing
   , GMachine
   , GNode(..), GGraph, HeapAddr
   , getChildren, getStack, getCodePtr
-  , isTermination
+  , isTermination, getCurrentRedexRoot
   )
 
 import Basics.Extra exposing (flip)
@@ -133,6 +133,14 @@ stackLens = Lens.compose accessCtx accessStack
 
 getStack : GMachine -> GStack
 getStack = stackLens.get
+
+getCurrentRedexRoot : GMachine -> Maybe HeapAddr
+getCurrentRedexRoot = getStack >> List.Extra.last
+
+{-| retrieve all the addresses referenced by the stack and dump
+-}
+stackPointers : GMachine -> List HeapAddr
+stackPointers m = getStack m ++ List.concatMap .stack m.dump 
 
 getCodePtr : GMachine -> CodePtr
 getCodePtr = codePtrLens.get
@@ -475,18 +483,14 @@ reachableNodes root graph visited =
 starting with the stack pointers (as well as in the dump) 
 -}
 garbageCollection : GMachine -> RuntimeResult
-garbageCollection ({dump, graph} as gmachine) =
-  let stackPointers = Debug.log "stack pointers" <| List.concat
-        (getStack gmachine :: List.map .stack dump)
-
-
-      reachableCells = Debug.log "reachable cells" <| List.foldl
+garbageCollection ({graph} as gmachine) =
+  let reachableCells = List.foldl
         (\ref visited -> reachableNodes ref graph visited)
         Set.empty
-        stackPointers
+        (stackPointers gmachine)
 
       cleanedGraph = Dict.filter
-        (\ref data -> Debug.log ("node" ++ String.fromInt ref) <| Set.member ref reachableCells)
+        (\ref data -> Set.member ref reachableCells)
         graph
       
       removedCells = List.filter
