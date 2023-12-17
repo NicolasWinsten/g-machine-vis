@@ -12902,21 +12902,39 @@ var $author$project$GMachine$createMachine = function (source) {
 		},
 		$author$project$Backend$compile(source));
 };
-var $author$project$Main$MachineView = F3(
-	function (runtime, layout, forceSim) {
-		return {forceSim: forceSim, layout: layout, runtime: runtime};
-	});
 var $elm_community$graph$Graph$Graph = function (a) {
 	return {$: 'Graph', a: a};
 };
 var $elm_community$intdict$IntDict$Empty = {$: 'Empty'};
 var $elm_community$intdict$IntDict$empty = $elm_community$intdict$IntDict$Empty;
 var $elm_community$graph$Graph$empty = $elm_community$graph$Graph$Graph($elm_community$intdict$IntDict$empty);
-var $gampleman$elm_visualization$Force$Center = F2(
-	function (a, b) {
-		return {$: 'Center', a: a, b: b};
-	});
-var $gampleman$elm_visualization$Force$center = $gampleman$elm_visualization$Force$Center;
+var $gampleman$elm_visualization$Force$State = function (a) {
+	return {$: 'State', a: a};
+};
+var $elm$core$Basics$pow = _Basics_pow;
+var $gampleman$elm_visualization$Force$simulation = function (forces) {
+	return $gampleman$elm_visualization$Force$State(
+		{
+			alpha: 1.0,
+			alphaDecay: 1 - A2($elm$core$Basics$pow, 0.001, 1 / 300),
+			alphaTarget: 0.0,
+			forces: forces,
+			minAlpha: 0.001,
+			velocityDecay: 0.6
+		});
+};
+var $author$project$GMachine$GHole = {$: 'GHole'};
+var $author$project$Main$accessLayout = A2(
+	$arturopala$elm_monocle$Monocle$Lens$Lens,
+	function ($) {
+		return $.layout;
+	},
+	F2(
+		function (l, m) {
+			return _Utils_update(
+				m,
+				{layout: l});
+		}));
 var $elm_community$intdict$IntDict$foldl = F3(
 	function (f, acc, dict) {
 		foldl:
@@ -12939,50 +12957,6 @@ var $elm_community$intdict$IntDict$foldl = F3(
 			}
 		}
 	});
-var $elm_community$graph$Graph$unGraph = function (graph) {
-	var rep = graph.a;
-	return rep;
-};
-var $elm_community$graph$Graph$edges = function (graph) {
-	var flippedFoldl = F3(
-		function (f, dict, list) {
-			return A3($elm_community$intdict$IntDict$foldl, f, list, dict);
-		});
-	var prependEdges = F2(
-		function (node1, ctx) {
-			return A2(
-				flippedFoldl,
-				F2(
-					function (node2, e) {
-						return $elm$core$List$cons(
-							{from: node1, label: e, to: node2});
-					}),
-				ctx.outgoing);
-		});
-	return A3(
-		flippedFoldl,
-		prependEdges,
-		$elm_community$graph$Graph$unGraph(graph),
-		_List_Nil);
-};
-var $gampleman$elm_visualization$Force$State = function (a) {
-	return {$: 'State', a: a};
-};
-var $elm$core$Basics$pow = _Basics_pow;
-var $gampleman$elm_visualization$Force$iterations = F2(
-	function (iters, _v0) {
-		var config = _v0.a;
-		return $gampleman$elm_visualization$Force$State(
-			_Utils_update(
-				config,
-				{
-					alphaDecay: 1 - A2($elm$core$Basics$pow, config.minAlpha, 1 / iters)
-				}));
-	});
-var $gampleman$elm_visualization$Force$Links = F2(
-	function (a, b) {
-		return {$: 'Links', a: a, b: b};
-	});
 var $elm$core$Maybe$map = F2(
 	function (f, maybe) {
 		if (maybe.$ === 'Just') {
@@ -12993,183 +12967,6 @@ var $elm$core$Maybe$map = F2(
 			return $elm$core$Maybe$Nothing;
 		}
 	});
-var $elm$core$Basics$min = F2(
-	function (x, y) {
-		return (_Utils_cmp(x, y) < 0) ? x : y;
-	});
-var $gampleman$elm_visualization$Force$customLinks = F2(
-	function (iters, list) {
-		var counts = A3(
-			$elm$core$List$foldr,
-			F2(
-				function (_v1, d) {
-					var source = _v1.source;
-					var target = _v1.target;
-					return A3(
-						$elm$core$Dict$update,
-						target,
-						A2(
-							$elm$core$Basics$composeL,
-							A2(
-								$elm$core$Basics$composeL,
-								$elm$core$Maybe$Just,
-								$elm$core$Maybe$withDefault(1)),
-							$elm$core$Maybe$map(
-								$elm$core$Basics$add(1))),
-						A3(
-							$elm$core$Dict$update,
-							source,
-							A2(
-								$elm$core$Basics$composeL,
-								A2(
-									$elm$core$Basics$composeL,
-									$elm$core$Maybe$Just,
-									$elm$core$Maybe$withDefault(1)),
-								$elm$core$Maybe$map(
-									$elm$core$Basics$add(1))),
-							d));
-				}),
-			$elm$core$Dict$empty,
-			list);
-		var count = function (key) {
-			return A2(
-				$elm$core$Maybe$withDefault,
-				0,
-				A2($elm$core$Dict$get, key, counts));
-		};
-		return A2(
-			$gampleman$elm_visualization$Force$Links,
-			iters,
-			A2(
-				$elm$core$List$map,
-				function (_v0) {
-					var source = _v0.source;
-					var target = _v0.target;
-					var distance = _v0.distance;
-					var strength = _v0.strength;
-					return {
-						bias: count(source) / (count(source) + count(target)),
-						distance: distance,
-						source: source,
-						strength: A2(
-							$elm$core$Maybe$withDefault,
-							1 / A2(
-								$elm$core$Basics$min,
-								count(source),
-								count(target)),
-							strength),
-						target: target
-					};
-				},
-				list));
-	});
-var $gampleman$elm_visualization$Force$links = A2(
-	$elm$core$Basics$composeR,
-	$elm$core$List$map(
-		function (_v0) {
-			var source = _v0.a;
-			var target = _v0.b;
-			return {distance: 30, source: source, strength: $elm$core$Maybe$Nothing, target: target};
-		}),
-	$gampleman$elm_visualization$Force$customLinks(1));
-var $gampleman$elm_visualization$Force$ManyBody = F2(
-	function (a, b) {
-		return {$: 'ManyBody', a: a, b: b};
-	});
-var $gampleman$elm_visualization$Force$customManyBody = function (theta) {
-	return A2(
-		$elm$core$Basics$composeR,
-		$elm$core$Dict$fromList,
-		$gampleman$elm_visualization$Force$ManyBody(theta));
-};
-var $gampleman$elm_visualization$Force$manyBodyStrength = function (strength) {
-	return A2(
-		$elm$core$Basics$composeL,
-		$gampleman$elm_visualization$Force$customManyBody(0.9),
-		$elm$core$List$map(
-			function (key) {
-				return _Utils_Tuple2(key, strength);
-			}));
-};
-var $elm_community$intdict$IntDict$foldr = F3(
-	function (f, acc, dict) {
-		foldr:
-		while (true) {
-			switch (dict.$) {
-				case 'Empty':
-					return acc;
-				case 'Leaf':
-					var l = dict.a;
-					return A3(f, l.key, l.value, acc);
-				default:
-					var i = dict.a;
-					var $temp$f = f,
-						$temp$acc = A3($elm_community$intdict$IntDict$foldr, f, acc, i.right),
-						$temp$dict = i.left;
-					f = $temp$f;
-					acc = $temp$acc;
-					dict = $temp$dict;
-					continue foldr;
-			}
-		}
-	});
-var $elm_community$intdict$IntDict$keys = function (dict) {
-	return A3(
-		$elm_community$intdict$IntDict$foldr,
-		F3(
-			function (key, value, keyList) {
-				return A2($elm$core$List$cons, key, keyList);
-			}),
-		_List_Nil,
-		dict);
-};
-var $elm_community$graph$Graph$nodeIds = A2($elm$core$Basics$composeR, $elm_community$graph$Graph$unGraph, $elm_community$intdict$IntDict$keys);
-var $gampleman$elm_visualization$Force$simulation = function (forces) {
-	return $gampleman$elm_visualization$Force$State(
-		{
-			alpha: 1.0,
-			alphaDecay: 1 - A2($elm$core$Basics$pow, 0.001, 1 / 300),
-			alphaTarget: 0.0,
-			forces: forces,
-			minAlpha: 0.001,
-			velocityDecay: 0.6
-		});
-};
-var $author$project$Main$makeForceSim = function (layout) {
-	var edges = A2(
-		$elm$core$List$map,
-		function (_v0) {
-			var from = _v0.from;
-			var to = _v0.to;
-			return _Utils_Tuple2(from, to);
-		},
-		$elm_community$graph$Graph$edges(layout));
-	return A2(
-		$gampleman$elm_visualization$Force$iterations,
-		1000,
-		$gampleman$elm_visualization$Force$simulation(
-			_List_fromArray(
-				[
-					A2(
-					$gampleman$elm_visualization$Force$manyBodyStrength,
-					-5,
-					$elm_community$graph$Graph$nodeIds(layout)),
-					$gampleman$elm_visualization$Force$links(edges),
-					A2($gampleman$elm_visualization$Force$center, 0, 0)
-				])));
-};
-var $author$project$GMachine$GHole = {$: 'GHole'};
-var $author$project$Main$accessLayout = A2(
-	$arturopala$elm_monocle$Monocle$Lens$Lens,
-	function ($) {
-		return $.layout;
-	},
-	F2(
-		function (l, m) {
-			return _Utils_update(
-				m,
-				{layout: l});
-		}));
 var $elm_community$intdict$IntDict$Inner = function (a) {
 	return {$: 'Inner', a: a};
 };
@@ -13504,6 +13301,10 @@ var $elm_community$intdict$IntDict$member = F2(
 			return false;
 		}
 	});
+var $elm_community$graph$Graph$unGraph = function (graph) {
+	var rep = graph.a;
+	return rep;
+};
 var $elm_community$graph$Graph$update = F2(
 	function (nodeId, updater) {
 		var wrappedUpdater = function (rep) {
@@ -13547,28 +13348,413 @@ var $elm_community$graph$Graph$remove = F2(
 			$elm$core$Basics$always($elm$core$Maybe$Nothing),
 			graph);
 	});
-var $author$project$Main$deleteNodeFromLayout = $elm_community$graph$Graph$remove;
+var $gampleman$elm_visualization$Force$Center = F2(
+	function (a, b) {
+		return {$: 'Center', a: a, b: b};
+	});
+var $gampleman$elm_visualization$Force$center = $gampleman$elm_visualization$Force$Center;
+var $elm_community$graph$Graph$edges = function (graph) {
+	var flippedFoldl = F3(
+		function (f, dict, list) {
+			return A3($elm_community$intdict$IntDict$foldl, f, list, dict);
+		});
+	var prependEdges = F2(
+		function (node1, ctx) {
+			return A2(
+				flippedFoldl,
+				F2(
+					function (node2, e) {
+						return $elm$core$List$cons(
+							{from: node1, label: e, to: node2});
+					}),
+				ctx.outgoing);
+		});
+	return A3(
+		flippedFoldl,
+		prependEdges,
+		$elm_community$graph$Graph$unGraph(graph),
+		_List_Nil);
+};
+var $elm$core$List$maximum = function (list) {
+	if (list.b) {
+		var x = list.a;
+		var xs = list.b;
+		return $elm$core$Maybe$Just(
+			A3($elm$core$List$foldl, $elm$core$Basics$max, x, xs));
+	} else {
+		return $elm$core$Maybe$Nothing;
+	}
+};
+var $elm$core$Basics$min = F2(
+	function (x, y) {
+		return (_Utils_cmp(x, y) < 0) ? x : y;
+	});
+var $elm$core$List$minimum = function (list) {
+	if (list.b) {
+		var x = list.a;
+		var xs = list.b;
+		return $elm$core$Maybe$Just(
+			A3($elm$core$List$foldl, $elm$core$Basics$min, x, xs));
+	} else {
+		return $elm$core$Maybe$Nothing;
+	}
+};
+var $author$project$Main$nodeSize = 5;
+var $elm_community$intdict$IntDict$foldr = F3(
+	function (f, acc, dict) {
+		foldr:
+		while (true) {
+			switch (dict.$) {
+				case 'Empty':
+					return acc;
+				case 'Leaf':
+					var l = dict.a;
+					return A3(f, l.key, l.value, acc);
+				default:
+					var i = dict.a;
+					var $temp$f = f,
+						$temp$acc = A3($elm_community$intdict$IntDict$foldr, f, acc, i.right),
+						$temp$dict = i.left;
+					f = $temp$f;
+					acc = $temp$acc;
+					dict = $temp$dict;
+					continue foldr;
+			}
+		}
+	});
+var $elm_community$intdict$IntDict$values = function (dict) {
+	return A3(
+		$elm_community$intdict$IntDict$foldr,
+		F3(
+			function (key, value, valueList) {
+				return A2($elm$core$List$cons, value, valueList);
+			}),
+		_List_Nil,
+		dict);
+};
+var $elm_community$graph$Graph$nodes = A2(
+	$elm$core$Basics$composeR,
+	$elm_community$graph$Graph$unGraph,
+	A2(
+		$elm$core$Basics$composeR,
+		$elm_community$intdict$IntDict$values,
+		$elm$core$List$map(
+			function ($) {
+				return $.node;
+			})));
+var $author$project$Main$layoutDimensions = function (layout) {
+	var min = A2(
+		$elm$core$Basics$composeR,
+		$elm$core$List$minimum,
+		$elm$core$Maybe$withDefault(0));
+	var max = A2(
+		$elm$core$Basics$composeR,
+		$elm$core$List$maximum,
+		$elm$core$Maybe$withDefault(0));
+	var entities = $elm_community$graph$Graph$nodes(layout);
+	var xvals = A2(
+		$elm$core$List$map,
+		A2(
+			$elm$core$Basics$composeR,
+			function ($) {
+				return $.label;
+			},
+			function ($) {
+				return $.x;
+			}),
+		entities);
+	var yvals = A2(
+		$elm$core$List$map,
+		A2(
+			$elm$core$Basics$composeR,
+			function ($) {
+				return $.label;
+			},
+			function ($) {
+				return $.x;
+			}),
+		entities);
+	var _v0 = _Utils_Tuple2(
+		max(yvals),
+		min(yvals));
+	var maxY = _v0.a;
+	var minY = _v0.b;
+	var _v1 = _Utils_Tuple2(
+		max(xvals),
+		min(xvals));
+	var maxX = _v1.a;
+	var minX = _v1.b;
+	return {height: (maxY - minY) + $author$project$Main$nodeSize, width: (maxX - minX) + $author$project$Main$nodeSize};
+};
+var $gampleman$elm_visualization$Force$Links = F2(
+	function (a, b) {
+		return {$: 'Links', a: a, b: b};
+	});
+var $gampleman$elm_visualization$Force$customLinks = F2(
+	function (iters, list) {
+		var counts = A3(
+			$elm$core$List$foldr,
+			F2(
+				function (_v1, d) {
+					var source = _v1.source;
+					var target = _v1.target;
+					return A3(
+						$elm$core$Dict$update,
+						target,
+						A2(
+							$elm$core$Basics$composeL,
+							A2(
+								$elm$core$Basics$composeL,
+								$elm$core$Maybe$Just,
+								$elm$core$Maybe$withDefault(1)),
+							$elm$core$Maybe$map(
+								$elm$core$Basics$add(1))),
+						A3(
+							$elm$core$Dict$update,
+							source,
+							A2(
+								$elm$core$Basics$composeL,
+								A2(
+									$elm$core$Basics$composeL,
+									$elm$core$Maybe$Just,
+									$elm$core$Maybe$withDefault(1)),
+								$elm$core$Maybe$map(
+									$elm$core$Basics$add(1))),
+							d));
+				}),
+			$elm$core$Dict$empty,
+			list);
+		var count = function (key) {
+			return A2(
+				$elm$core$Maybe$withDefault,
+				0,
+				A2($elm$core$Dict$get, key, counts));
+		};
+		return A2(
+			$gampleman$elm_visualization$Force$Links,
+			iters,
+			A2(
+				$elm$core$List$map,
+				function (_v0) {
+					var source = _v0.source;
+					var target = _v0.target;
+					var distance = _v0.distance;
+					var strength = _v0.strength;
+					return {
+						bias: count(source) / (count(source) + count(target)),
+						distance: distance,
+						source: source,
+						strength: A2(
+							$elm$core$Maybe$withDefault,
+							1 / A2(
+								$elm$core$Basics$min,
+								count(source),
+								count(target)),
+							strength),
+						target: target
+					};
+				},
+				list));
+	});
+var $gampleman$elm_visualization$Force$links = A2(
+	$elm$core$Basics$composeR,
+	$elm$core$List$map(
+		function (_v0) {
+			var source = _v0.a;
+			var target = _v0.b;
+			return {distance: 30, source: source, strength: $elm$core$Maybe$Nothing, target: target};
+		}),
+	$gampleman$elm_visualization$Force$customLinks(1));
+var $gampleman$elm_visualization$Force$ManyBody = F2(
+	function (a, b) {
+		return {$: 'ManyBody', a: a, b: b};
+	});
+var $gampleman$elm_visualization$Force$customManyBody = function (theta) {
+	return A2(
+		$elm$core$Basics$composeR,
+		$elm$core$Dict$fromList,
+		$gampleman$elm_visualization$Force$ManyBody(theta));
+};
+var $gampleman$elm_visualization$Force$manyBodyStrength = function (strength) {
+	return A2(
+		$elm$core$Basics$composeL,
+		$gampleman$elm_visualization$Force$customManyBody(0.9),
+		$elm$core$List$map(
+			function (key) {
+				return _Utils_Tuple2(key, strength);
+			}));
+};
+var $gampleman$elm_visualization$Force$manyBody = $gampleman$elm_visualization$Force$manyBodyStrength(-30);
+var $elm$core$Maybe$map2 = F3(
+	function (func, ma, mb) {
+		if (ma.$ === 'Nothing') {
+			return $elm$core$Maybe$Nothing;
+		} else {
+			var a = ma.a;
+			if (mb.$ === 'Nothing') {
+				return $elm$core$Maybe$Nothing;
+			} else {
+				var b = mb.a;
+				return $elm$core$Maybe$Just(
+					A2(func, a, b));
+			}
+		}
+	});
+var $elm_community$intdict$IntDict$keys = function (dict) {
+	return A3(
+		$elm_community$intdict$IntDict$foldr,
+		F3(
+			function (key, value, keyList) {
+				return A2($elm$core$List$cons, key, keyList);
+			}),
+		_List_Nil,
+		dict);
+};
+var $elm_community$graph$Graph$nodeIds = A2($elm$core$Basics$composeR, $elm_community$graph$Graph$unGraph, $elm_community$intdict$IntDict$keys);
+var $gampleman$elm_visualization$Force$X = function (a) {
+	return {$: 'X', a: a};
+};
+var $gampleman$elm_visualization$Force$towardsX = function (configs) {
+	return $gampleman$elm_visualization$Force$X(
+		$elm$core$Dict$fromList(
+			A2(
+				$elm$core$List$map,
+				function (_v0) {
+					var node = _v0.node;
+					var strength = _v0.strength;
+					var target = _v0.target;
+					return _Utils_Tuple2(
+						node,
+						{position: target, strength: strength});
+				},
+				configs)));
+};
+var $gampleman$elm_visualization$Force$Y = function (a) {
+	return {$: 'Y', a: a};
+};
+var $gampleman$elm_visualization$Force$towardsY = function (configs) {
+	return $gampleman$elm_visualization$Force$Y(
+		$elm$core$Dict$fromList(
+			A2(
+				$elm$core$List$map,
+				function (_v0) {
+					var node = _v0.node;
+					var strength = _v0.strength;
+					var target = _v0.target;
+					return _Utils_Tuple2(
+						node,
+						{position: target, strength: strength});
+				},
+				configs)));
+};
+var $author$project$Main$makeForceSim = function (_v0) {
+	var layout = _v0.layout;
+	var spineTip = _v0.spineTip;
+	var spineRoot = _v0.spineRoot;
+	var spinePullStrength = 0.05;
+	var gravitateNodes = A2(
+		$elm$core$List$map,
+		function (id) {
+			return {node: id, strength: 0.01, target: 0};
+		},
+		$elm_community$graph$Graph$nodeIds(layout));
+	var edges = A2(
+		$elm$core$List$map,
+		function (_v2) {
+			var from = _v2.from;
+			var to = _v2.to;
+			return _Utils_Tuple2(from, to);
+		},
+		$elm_community$graph$Graph$edges(layout));
+	var _v1 = $author$project$Main$layoutDimensions(layout);
+	var width = _v1.width;
+	var height = _v1.height;
+	var pullSpine = A2(
+		$elm$core$Maybe$withDefault,
+		_List_Nil,
+		A3(
+			$elm$core$Maybe$map2,
+			F2(
+				function (rootId, tipId) {
+					return _List_fromArray(
+						[
+							$gampleman$elm_visualization$Force$towardsX(
+							_List_fromArray(
+								[
+									{node: rootId, strength: spinePullStrength, target: width},
+									{node: tipId, strength: spinePullStrength, target: -width}
+								])),
+							$gampleman$elm_visualization$Force$towardsY(
+							_List_fromArray(
+								[
+									{node: rootId, strength: spinePullStrength, target: -height},
+									{node: tipId, strength: spinePullStrength, target: height}
+								]))
+						]);
+				}),
+			spineRoot,
+			spineTip));
+	return $gampleman$elm_visualization$Force$simulation(
+		_Utils_ap(
+			_List_fromArray(
+				[
+					$gampleman$elm_visualization$Force$manyBody(
+					$elm_community$graph$Graph$nodeIds(layout)),
+					$gampleman$elm_visualization$Force$links(edges),
+					A2($gampleman$elm_visualization$Force$center, 0, 0),
+					$gampleman$elm_visualization$Force$towardsX(gravitateNodes),
+					$gampleman$elm_visualization$Force$towardsY(gravitateNodes)
+				]),
+			pullSpine));
+};
+var $author$project$Main$resetForceSim = function (mview) {
+	return _Utils_update(
+		mview,
+		{
+			forceSim: $author$project$Main$makeForceSim(mview)
+		});
+};
+var $author$project$Main$setSpineRoot = F2(
+	function (spineRoot, mv) {
+		return _Utils_update(
+			mv,
+			{spineRoot: spineRoot});
+	});
+var $author$project$Main$setSpineTip = F2(
+	function (spineTip, mv) {
+		return _Utils_update(
+			mv,
+			{spineTip: spineTip});
+	});
+var $author$project$Main$when = F3(
+	function (cond, f, x) {
+		return cond ? f(x) : x;
+	});
+var $author$project$Main$deleteNodeFromLayout = F2(
+	function (id, mv) {
+		var spineRoot = mv.spineRoot;
+		var spineTip = mv.spineTip;
+		return $author$project$Main$resetForceSim(
+			A3(
+				$author$project$Main$when,
+				_Utils_eq(
+					spineTip,
+					$elm$core$Maybe$Just(id)),
+				$author$project$Main$setSpineTip($elm$core$Maybe$Nothing),
+				A3(
+					$author$project$Main$when,
+					_Utils_eq(
+						spineRoot,
+						$elm$core$Maybe$Just(id)),
+					$author$project$Main$setSpineRoot($elm$core$Maybe$Nothing),
+					A3(
+						$arturopala$elm_monocle$Monocle$Lens$modify,
+						$author$project$Main$accessLayout,
+						$elm_community$graph$Graph$remove(id),
+						mv))));
+	});
 var $author$project$Main$Left = {$: 'Left'};
 var $author$project$Main$Right = {$: 'Right'};
-var $elm$core$Basics$cos = _Basics_cos;
-var $elm$core$Basics$pi = _Basics_pi;
-var $elm$core$Basics$sqrt = _Basics_sqrt;
-var $gampleman$elm_visualization$Force$initialAngle = $elm$core$Basics$pi * (3 - $elm$core$Basics$sqrt(5));
-var $gampleman$elm_visualization$Force$initialRadius = 10;
-var $elm$core$Basics$sin = _Basics_sin;
-var $gampleman$elm_visualization$Force$entity = F2(
-	function (index, a) {
-		var radius = $elm$core$Basics$sqrt(0.5 + index) * $gampleman$elm_visualization$Force$initialRadius;
-		var angle = index * $gampleman$elm_visualization$Force$initialAngle;
-		return {
-			id: index,
-			value: a,
-			vx: 0.0,
-			vy: 0.0,
-			x: radius * $elm$core$Basics$cos(angle),
-			y: radius * $elm$core$Basics$sin(angle)
-		};
-	});
 var $elm_community$intdict$IntDict$fromList = function (pairs) {
 	return A3(
 		$elm$core$List$foldl,
@@ -13590,6 +13776,41 @@ var $author$project$GMachine$getChildren = function (node) {
 		return $elm$core$Maybe$Nothing;
 	}
 };
+var $author$project$Main$getOutgoing = function (node) {
+	var _v0 = $author$project$GMachine$getChildren(node);
+	if (_v0.$ === 'Just') {
+		var _v1 = _v0.a;
+		var left = _v1.a;
+		var right = _v1.b;
+		return $elm_community$intdict$IntDict$fromList(
+			_List_fromArray(
+				[
+					_Utils_Tuple2(left, $author$project$Main$Left),
+					_Utils_Tuple2(right, $author$project$Main$Right)
+				]));
+	} else {
+		return $elm_community$intdict$IntDict$empty;
+	}
+};
+var $elm$core$Basics$cos = _Basics_cos;
+var $elm$core$Basics$pi = _Basics_pi;
+var $elm$core$Basics$sqrt = _Basics_sqrt;
+var $gampleman$elm_visualization$Force$initialAngle = $elm$core$Basics$pi * (3 - $elm$core$Basics$sqrt(5));
+var $gampleman$elm_visualization$Force$initialRadius = 10;
+var $elm$core$Basics$sin = _Basics_sin;
+var $gampleman$elm_visualization$Force$entity = F2(
+	function (index, a) {
+		var radius = $elm$core$Basics$sqrt(0.5 + index) * $gampleman$elm_visualization$Force$initialRadius;
+		var angle = index * $gampleman$elm_visualization$Force$initialAngle;
+		return {
+			id: index,
+			value: a,
+			vx: 0.0,
+			vy: 0.0,
+			x: radius * $elm$core$Basics$cos(angle),
+			y: radius * $elm$core$Basics$sin(angle)
+		};
+	});
 var $elm_community$graph$Graph$insert = F2(
 	function (nodeContext, graph) {
 		return A3(
@@ -13605,59 +13826,31 @@ var $author$project$Main$insertNode = F2(
 			id: id,
 			label: A2($gampleman$elm_visualization$Force$entity, id, node)
 		};
-		var edges = function () {
-			var _v0 = $author$project$GMachine$getChildren(node);
-			if (_v0.$ === 'Just') {
-				var _v1 = _v0.a;
-				var left = _v1.a;
-				var right = _v1.b;
-				return $elm_community$intdict$IntDict$fromList(
-					_List_fromArray(
-						[
-							_Utils_Tuple2(left, $author$project$Main$Left),
-							_Utils_Tuple2(right, $author$project$Main$Right)
-						]));
-			} else {
-				return $elm_community$intdict$IntDict$empty;
-			}
-		}();
-		return $elm_community$graph$Graph$insert(
-			{incoming: $elm_community$intdict$IntDict$empty, node: nodeEntity, outgoing: edges});
+		var edges = $author$project$Main$getOutgoing(node);
+		return A2(
+			$elm$core$Basics$composeR,
+			A2(
+				$arturopala$elm_monocle$Monocle$Lens$modify,
+				$author$project$Main$accessLayout,
+				$elm_community$graph$Graph$insert(
+					{incoming: $elm_community$intdict$IntDict$empty, node: nodeEntity, outgoing: edges})),
+			$author$project$Main$resetForceSim);
 	});
-var $author$project$Main$resetForceSim = function (mview) {
-	return _Utils_update(
-		mview,
-		{
-			forceSim: $author$project$Main$makeForceSim(mview.layout)
-		});
-};
 var $author$project$Main$updateMachineView = function (machineUpdate) {
 	switch (machineUpdate.$) {
 		case 'NewNodeAllocated':
 			var id = machineUpdate.a;
 			var node = machineUpdate.b;
-			return A2(
-				$elm$core$Basics$composeR,
-				A2(
-					$arturopala$elm_monocle$Monocle$Lens$modify,
-					$author$project$Main$accessLayout,
-					A2($author$project$Main$insertNode, id, node)),
-				$author$project$Main$resetForceSim);
+			return A2($author$project$Main$insertNode, id, node);
 		case 'HolesAllocated':
 			var holeNodeIds = machineUpdate.a;
-			return A2(
-				$elm$core$Basics$composeR,
-				A2(
-					$arturopala$elm_monocle$Monocle$Lens$modify,
-					$author$project$Main$accessLayout,
-					function (layout) {
-						return A3(
-							$elm$core$List$foldl,
-							A2($elm_community$basics_extra$Basics$Extra$flip, $author$project$Main$insertNode, $author$project$GMachine$GHole),
-							layout,
-							holeNodeIds);
-					}),
-				$author$project$Main$resetForceSim);
+			return function (mv) {
+				return A3(
+					$elm$core$List$foldl,
+					A2($elm_community$basics_extra$Basics$Extra$flip, $author$project$Main$insertNode, $author$project$GMachine$GHole),
+					mv,
+					holeNodeIds);
+			};
 		case 'Multiple':
 			var update1 = machineUpdate.a;
 			var update2 = machineUpdate.b;
@@ -13671,28 +13864,55 @@ var $author$project$Main$updateMachineView = function (machineUpdate) {
 			return $elm$core$Basics$identity;
 		case 'GarbageCollection':
 			var refs = machineUpdate.a;
+			return function (mv) {
+				return A3($elm$core$List$foldl, $author$project$Main$deleteNodeFromLayout, mv, refs);
+			};
+		case 'EnteredCode':
+			var _function = machineUpdate.a;
+			return $elm$core$Basics$identity;
+		case 'StartedUnwind':
+			var id = machineUpdate.a;
+			return $author$project$Main$setSpineRoot(
+				$elm$core$Maybe$Just(id));
+		case 'Unwound':
+			var id = machineUpdate.a;
+			return A2(
+				$elm$core$Basics$composeR,
+				$author$project$Main$setSpineTip(
+					$elm$core$Maybe$Just(id)),
+				$author$project$Main$resetForceSim);
+		case 'RedexRootReplaced':
+			var id = machineUpdate.a;
+			var reduct = machineUpdate.b;
+			var setValue = function (n) {
+				var label = n.label;
+				return _Utils_update(
+					n,
+					{
+						label: _Utils_update(
+							label,
+							{value: reduct})
+					});
+			};
+			var outgoing = $author$project$Main$getOutgoing(reduct);
+			var updateCtx = function (ctx) {
+				return _Utils_update(
+					ctx,
+					{
+						node: setValue(ctx.node),
+						outgoing: outgoing
+					});
+			};
 			return A2(
 				$elm$core$Basics$composeR,
 				A2(
 					$arturopala$elm_monocle$Monocle$Lens$modify,
 					$author$project$Main$accessLayout,
-					function (layout) {
-						return A3($elm$core$List$foldl, $author$project$Main$deleteNodeFromLayout, layout, refs);
-					}),
+					A2(
+						$elm_community$graph$Graph$update,
+						id,
+						$elm$core$Maybe$map(updateCtx))),
 				$author$project$Main$resetForceSim);
-		case 'EnteredCode':
-			var _function = machineUpdate.a;
-			return $elm$core$Basics$identity;
-		case 'Unwound':
-			var id = machineUpdate.a;
-			return $elm$core$Basics$identity;
-		case 'RedexRootReplaced':
-			var id = machineUpdate.a;
-			var node = machineUpdate.b;
-			return A2(
-				$arturopala$elm_monocle$Monocle$Lens$modify,
-				$author$project$Main$accessLayout,
-				A2($author$project$Main$insertNode, id, node));
 		default:
 			return $elm$core$Basics$identity;
 	}
@@ -13703,11 +13923,13 @@ var $author$project$Main$initializeMachineView = function (result) {
 	return A2(
 		$author$project$Main$updateMachineView,
 		machineUpdate,
-		A3(
-			$author$project$Main$MachineView,
-			result,
-			$elm_community$graph$Graph$empty,
-			$author$project$Main$makeForceSim($elm_community$graph$Graph$empty)));
+		{
+			forceSim: $gampleman$elm_visualization$Force$simulation(_List_Nil),
+			layout: $elm_community$graph$Graph$empty,
+			runtime: result,
+			spineRoot: $elm$core$Maybe$Nothing,
+			spineTip: $elm$core$Maybe$Nothing
+		});
 };
 var $elm_community$result_extra$Result$Extra$unpack = F3(
 	function (errFunc, okFunc, result) {
@@ -13730,7 +13952,7 @@ var $author$project$Main$compileSourceCode = function (sourceCode) {
 		$author$project$GMachine$createMachine(sourceCode));
 };
 var $elm$browser$Browser$Dom$getViewport = _Browser_withWindow(_Browser_getViewport);
-var $author$project$Main$initialProgram = '\nmin x y = x-y\ndouble x=x+x\nmain = 3 - 1 - 3\n';
+var $author$project$Main$initialProgram = '\ndouble x = x + x\n\ntwice f x = f (f x)\n\nmain = twice double 2\n';
 var $elm$core$Basics$round = _Basics_round;
 var $author$project$Main$init = _Utils_Tuple2(
 	A2(
@@ -17004,26 +17226,6 @@ var $mdgriffith$elm_ui$Internal$Model$adjust = F3(
 	function (size, height, vertical) {
 		return {height: height / size, size: size, vertical: vertical};
 	});
-var $elm$core$List$maximum = function (list) {
-	if (list.b) {
-		var x = list.a;
-		var xs = list.b;
-		return $elm$core$Maybe$Just(
-			A3($elm$core$List$foldl, $elm$core$Basics$max, x, xs));
-	} else {
-		return $elm$core$Maybe$Nothing;
-	}
-};
-var $elm$core$List$minimum = function (list) {
-	if (list.b) {
-		var x = list.a;
-		var xs = list.b;
-		return $elm$core$Maybe$Just(
-			A3($elm$core$List$foldl, $elm$core$Basics$min, x, xs));
-	} else {
-		return $elm$core$Maybe$Nothing;
-	}
-};
 var $mdgriffith$elm_ui$Internal$Model$convertAdjustment = function (adjustment) {
 	var lines = _List_fromArray(
 		[adjustment.capital, adjustment.baseline, adjustment.descender, adjustment.lowercase]);
@@ -19953,8 +20155,8 @@ var $author$project$GMachine$isUnwinding = function (gmachine) {
 		return false;
 	}
 };
-var $author$project$GMachine$Unwound = function (a) {
-	return {$: 'Unwound', a: a};
+var $author$project$GMachine$StartedUnwind = function (a) {
+	return {$: 'StartedUnwind', a: a};
 };
 var $author$project$GMachine$getTopVal = $author$project$GMachine$getFromStack(0);
 var $author$project$GMachine$Crash = function (a) {
@@ -19985,7 +20187,7 @@ var $author$project$GMachine$startUnwind = function (gmachine) {
 		$author$project$GMachine$getTopVal,
 		A2(
 			$elm$core$Basics$composeR,
-			$author$project$GMachine$Unwound,
+			$author$project$GMachine$StartedUnwind,
 			$elm_community$basics_extra$Basics$Extra$flip($elm$core$Tuple$pair)),
 		newMachine);
 };
@@ -20003,6 +20205,9 @@ var $author$project$GMachine$RedexRootReplaced = F2(
 	});
 var $author$project$GMachine$UnexpectedNode = function (a) {
 	return {$: 'UnexpectedNode', a: a};
+};
+var $author$project$GMachine$Unwound = function (a) {
+	return {$: 'Unwound', a: a};
 };
 var $author$project$GMachine$HolesAllocated = function (a) {
 	return {$: 'HolesAllocated', a: a};
@@ -20584,26 +20789,6 @@ var $author$project$Main$stepMachineView = function (mview) {
 			A2($author$project$Main$machineViewToRuntimeResult.set, result, mview));
 	}
 };
-var $elm_community$intdict$IntDict$values = function (dict) {
-	return A3(
-		$elm_community$intdict$IntDict$foldr,
-		F3(
-			function (key, value, valueList) {
-				return A2($elm$core$List$cons, value, valueList);
-			}),
-		_List_Nil,
-		dict);
-};
-var $elm_community$graph$Graph$nodes = A2(
-	$elm$core$Basics$composeR,
-	$elm_community$graph$Graph$unGraph,
-	A2(
-		$elm$core$Basics$composeR,
-		$elm_community$intdict$IntDict$values,
-		$elm$core$List$map(
-			function ($) {
-				return $.node;
-			})));
 var $gampleman$elm_visualization$Force$Jiggle$jiggle = function (v) {
 	return (!v) ? 1.0e-6 : v;
 };
@@ -21978,6 +22163,9 @@ var $gampleman$elm_visualization$Force$tick = F2(
 				$elm$core$Dict$values(newNodes)));
 	});
 var $author$project$Main$tickForceSim = function (mview) {
+	var layout = mview.layout;
+	var spineRoot = mview.spineRoot;
+	var forceSim = mview.forceSim;
 	var setLabel = F2(
 		function (l, ctx) {
 			return _Utils_update(
@@ -21991,8 +22179,8 @@ var $author$project$Main$tickForceSim = function (mview) {
 		function ($) {
 			return $.label;
 		},
-		$elm_community$graph$Graph$nodes(mview.layout));
-	var _v0 = A2($gampleman$elm_visualization$Force$tick, mview.forceSim, entities);
+		$elm_community$graph$Graph$nodes(layout));
+	var _v0 = A2($gampleman$elm_visualization$Force$tick, forceSim, entities);
 	var newSim = _v0.a;
 	var newEntities = _v0.b;
 	var newLayout = A3(
@@ -22004,7 +22192,7 @@ var $author$project$Main$tickForceSim = function (mview) {
 				$elm$core$Maybe$map(
 					setLabel(entity)));
 		},
-		mview.layout,
+		layout,
 		newEntities);
 	return _Utils_update(
 		mview,
@@ -23609,7 +23797,6 @@ var $goyalarchit$elm_dagre$Render$StandardDrawers$Attributes$linkStyle = functio
 			{linkStyle: ls});
 	};
 };
-var $author$project$Main$nodeSize = 5;
 var $goyalarchit$elm_dagre$Render$StandardDrawers$Attributes$strokeColor = function (f) {
 	return function (edc) {
 		return _Utils_update(
@@ -28003,8 +28190,8 @@ var $author$project$Main$view = function (_v0) {
 						_Debug_todo(
 							'Main',
 							{
-								start: {line: 439, column: 66},
-								end: {line: 439, column: 76}
+								start: {line: 494, column: 66},
+								end: {line: 494, column: 76}
 							}))
 					]),
 				_List_fromArray(
@@ -28027,8 +28214,8 @@ var $author$project$Main$view = function (_v0) {
 						_Debug_todo(
 							'Main',
 							{
-								start: {line: 443, column: 62},
-								end: {line: 443, column: 72}
+								start: {line: 498, column: 62},
+								end: {line: 498, column: 72}
 							}))
 					]),
 				A2($author$project$Main$viewProgram, viewport, program))
