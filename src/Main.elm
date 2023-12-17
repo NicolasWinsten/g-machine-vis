@@ -17,7 +17,7 @@ import TypedSvg as Svg
 import TypedSvg.Attributes as SvgA
 import TypedSvg.Types as SvgT
 import Result.Extra
-import Basics.Extra exposing (flip, atMost)
+import Basics.Extra exposing (flip)
 import Backend
 import Dict exposing (Dict)
 import Html.Attributes
@@ -26,31 +26,53 @@ import Task
 import Browser.Dom exposing (getViewport)
 import ZipList exposing (ZipList, ZipList(..))
 import Force
-import Dict.Extra
 import Monocle.Optional as Optional exposing (Optional)
 import Monocle.Lens as Lens exposing (Lens)
-import Math.Vector2 as V exposing (Vec2)
-import Maybe.Extra
 import Graph exposing (Graph)
 import IntDict
+import Tree exposing (Tree(..))
+import Set exposing (Set)
+import Graph
+import Hierarchy
+import Tree exposing (children)
 
-
+{-| each node in the graph's heap will be given an entity in a force simulation
+to track position and velocity
+-}
 type alias NodeEntity = Force.Entity G.HeapAddr { value : G.GNode }
 
+{-| a node can have at most two children (left and right)
+-}
 type Side = Left | Right
 
 type alias Edge = Graph.Edge Side
 
 type alias Node = Graph.Node NodeEntity
 
+type alias NodeContext = Graph.NodeContext NodeEntity Side
+
 type alias GraphLayout = Graph NodeEntity Side
 
+nodeToEntity : Lens Node NodeEntity
+nodeToEntity = Lens .label (\e n -> {n | label=e})
+
+entityPos : Lens NodeEntity (Float, Float)
+entityPos = Lens (\{x,y} -> (x,y)) (\(x,y) e -> {e | x=x, y=y})
+
+accessNode : Lens NodeContext Node
+accessNode = Lens .node (\n ctx -> {ctx | node=n})
+
+accessEntity : Lens NodeContext NodeEntity
+accessEntity = Lens.compose accessNode nodeToEntity
+
+accessPos : Lens NodeContext (Float, Float)
+accessPos = Lens.compose accessEntity entityPos
+
+
 type alias MachineView =
-  { runtime : G.RuntimeResult
+  { runtime : G.RuntimeResult -- TODO provide separate fields for machine and last update
   , layout : GraphLayout
   , forceSim : Force.State G.HeapAddr
-  , spineTip : Maybe G.HeapAddr
-  , spineRoot : Maybe G.HeapAddr
   }
 
 type ProgramView = Uninitialized | Running MachineView | CompilationError Backend.CompilerError
@@ -96,12 +118,6 @@ accessMachineView = Optional.compose (Optional.fromLens accessProgram) programTo
 accessGMachine : Lens MachineView G.GMachine
 accessGMachine = Lens.compose machineViewToRuntimeResult runtimeResultToGMachine
 
-setSpineTip : Maybe G.HeapAddr -> MachineView -> MachineView
-setSpineTip spineTip mv = {mv | spineTip=spineTip}
-
-setSpineRoot : Maybe G.HeapAddr -> MachineView -> MachineView
-setSpineRoot spineRoot mv = {mv | spineRoot=spineRoot} 
-
 when : Bool -> (a -> a) -> a -> a
 when cond f x = if cond then f x else x
 
@@ -110,87 +126,110 @@ getOutgoing node = case G.getChildren node of
   Just (left, right) -> IntDict.fromList [(left, Left), (right, Right)]
   Nothing -> IntDict.empty
 
-insertNode : G.HeapAddr -> G.GNode -> MachineView -> MachineView
-insertNode id node =
-  let edges = getOutgoing node
-      nodeEntity : Node
-      nodeEntity = {id=id, label=Force.entity id node}
-  in Lens.modify accessLayout
-  ( Graph.insert
-    { node=nodeEntity
-    , incoming=IntDict.empty
-    , outgoing=edges
-    }
-  )
-  >> resetForceSim
+getEntity : G.HeapAddr -> GraphLayout -> Maybe NodeEntity
+getEntity id graph = Maybe.map accessEntity.get (Graph.get id graph)
 
-deleteNodeFromLayout : G.HeapAddr -> MachineView -> MachineView
-deleteNodeFromLayout id ({spineRoot, spineTip} as mv) = mv
-  |> Lens.modify accessLayout (Graph.remove id)
-  |> when (spineRoot == Just id) (setSpineRoot Nothing)
-  |> when (spineTip == Just id) (setSpineTip Nothing)
-  |> resetForceSim
+{-| collect the tree described by a depth first search with the given seed node
+-}
+takeTree : G.HeapAddr -> Set G.HeapAddr -> GraphLayout -> Maybe (Tree G.HeapAddr)
+takeTree root seen graph =
+  if Set.member root seen then Nothing
+  else case Graph.get root graph of
+  Just {node, outgoing} ->
+    let children = IntDict.toList outgoing
+          |> List.sortBy (\(_,side) -> if side == Left then 0 else 1)
+          |> List.map Tuple.first
+    in Just
+    <| Tree node.id
+    <| List.filterMap (\child -> takeTree child (Set.insert root seen) graph) children
+  Nothing -> Nothing
 
-makeForceSim : MachineView -> Force.State G.HeapAddr
-makeForceSim {layout, spineTip, spineRoot} =
-  let edges = List.map (\{from, to} -> (from, to)) (Graph.edges layout)
+{-| compute a hierachical placement of a subtree of the heap graph where the current redex is the root
 
-      -- leftMost = List.map (.label >> .x) (Graph.nodes layout)
-      --   |> List.minimum
-      
-      -- bottomMost = List.map (.label >> .y) (Graph.nodes layout)
-      --   |> List.maximum
-      
-      {width, height} = layoutDimensions layout
+also return the edges participating in the tree
+-}
+hierarchicalLayout : G.GMachine -> GraphLayout
+  -> {placements : Dict G.HeapAddr (Float, Float), edges : List (G.HeapAddr, G.HeapAddr)}
+hierarchicalLayout machine layout =
+  let tree = Maybe.andThen (\root -> takeTree root Set.empty layout) (G.getCurrentRedexRoot machine)
+      edges = Maybe.withDefault [] (Maybe.map Tree.links tree)
+      applyLayout = Hierarchy.tidy
+        [ Hierarchy.nodeSize (always (nodeSize, nodeSize))
+        , Hierarchy.parentChildMargin (nodeSize * 3)
+        , Hierarchy.peerMargin (nodeSize * 2)
+        ]
+      placements = tree
+        |> Maybe.map applyLayout
+        |> Maybe.map (Tree.foldl (\{node,x,y} -> Dict.insert node (x,y)) Dict.empty)
+        |> Maybe.withDefault Dict.empty
+  in {placements=placements, edges=edges}
 
-      spinePullStrength = 0.05
-
-      -- pull on either ends of the spine to align it on the diagonal
-      pullSpine = Maybe.map2
-        (\rootId tipId ->
-          [ Force.towardsX
-            [ {node=rootId, target=width, strength=spinePullStrength}
-            , {node=tipId, target=-width, strength=spinePullStrength}
-            ]
-          , Force.towardsY
-            [ {node=rootId, target=-height, strength=spinePullStrength}
-            , {node=tipId, target=height, strength=spinePullStrength}
-            ]
-          ]
+resetForceSim : MachineView -> MachineView
+resetForceSim mview =
+  let hierarchy = hierarchicalLayout (accessGMachine.get mview) mview.layout
+      -- push nodes in the redex tree towards their hierarchical position
+      (hierarchyXs, hierarchyYs) = Dict.foldl
+        (\node (x,y) (xs, ys) ->
+          ({node=node, strength=0.5, target=x} :: xs, {node=node, strength=0.5, target=y} :: ys)
         )
-        spineRoot
-        spineTip
-        |> Maybe.withDefault []
-
+        ([],[])
+        hierarchy.placements
+      edges = List.map (\{from, to} -> (from, to)) (Graph.edges mview.layout)
+      
       -- gravitate all nodes towards center to mitigate fly away
       gravitateNodes = List.map
         (\id -> {node=id, strength=0.01, target=0})
-        (Graph.nodeIds layout)
-
+        (Graph.nodeIds mview.layout)
   in
-  -- Force.iterations 1000 <|
-  Force.simulation <|
-  [ Force.manyBody (Graph.nodeIds layout)
-  , Force.links edges
-  , Force.center 0 0
-  , Force.towardsX gravitateNodes
-  , Force.towardsY gravitateNodes
-  ] ++ pullSpine
+  { mview
+  | forceSim=Force.simulation
+    [ Force.manyBody (Graph.nodeIds mview.layout)
+    , Force.links edges
+    , Force.towardsX (gravitateNodes ++ hierarchyXs)
+    , Force.towardsY (gravitateNodes ++ hierarchyYs)
+    ]
+  }
 
-resetForceSim : MachineView -> MachineView
-resetForceSim mview = {mview | forceSim=makeForceSim mview}
+{-| make a node to be used in the graph layout
 
+the initial position will be set by the average of the node's children
+-}
+mkNode : G.HeapAddr -> G.GNode -> GraphLayout -> Node
+mkNode id node layout =
+  let e = Force.entity id node
+      avgPosOfChildren = case G.getChildren node of
+        Just (left, right) -> Maybe.map2
+          (\l r -> ((l.x + r.x) / 2, (l.y + r.y) / 2))
+          (getEntity left layout)
+          (getEntity right layout)
+        Nothing -> Nothing
+      initialPos = Maybe.withDefault (entityPos.get e) avgPosOfChildren
+  in {id=id, label=entityPos.set initialPos e}
+
+{-| insert a new node into the graph layout and reset the force simulation
+-}
+insertNode : G.HeapAddr -> G.GNode -> MachineView -> MachineView
+insertNode id node mview = mview
+  |> Lens.modify accessLayout
+  ( Graph.insert
+    { node=mkNode id node mview.layout
+    , incoming=IntDict.empty
+    , outgoing=getOutgoing node
+    }
+  )
+  |> resetForceSim
+
+deleteNodeFromLayout : G.HeapAddr -> MachineView -> MachineView
+deleteNodeFromLayout id = Lens.modify accessLayout (Graph.remove id) >> resetForceSim
+
+{-| update the graph layout using the force simulation
+-}
 tickForceSim : MachineView -> MachineView
-tickForceSim ({layout, spineRoot, forceSim} as mview) =
-  let entities = List.map .label (Graph.nodes layout)
+tickForceSim ({layout, forceSim} as mview) =
+  let entities = List.map nodeToEntity.get (Graph.nodes layout)
       (newSim, newEntities) = Force.tick forceSim entities
-
-      setLabel l ctx = {ctx | node={id=l.id, label=l}}
-      newLayout = List.foldl
-        (\entity -> Graph.update entity.id (Maybe.map (setLabel entity)))
-        layout
-        newEntities
-      
+      updateEntity e = Graph.update e.id (Maybe.map (accessEntity.set e)) 
+      newLayout = List.foldl updateEntity layout newEntities
   in {mview | layout=newLayout, forceSim=newSim}
 
 updateMachineView : G.MachineUpdate -> MachineView -> MachineView
@@ -209,32 +248,31 @@ updateMachineView machineUpdate = case machineUpdate of
 
   G.EnteredCode function -> identity
 
-  G.StartedUnwind id -> setSpineRoot (Just id)
+  G.StartedUnwind id -> identity
 
-  G.Unwound id -> setSpineTip (Just id) >> resetForceSim
+  G.Unwound id -> identity
 
   G.RedexRootReplaced id reduct ->
-    let outgoing = getOutgoing reduct
-        setValue ({label} as n) = {n | label={label | value=reduct}}
-        updateCtx ctx = {ctx | outgoing=outgoing, node=setValue ctx.node}
+    let updateNodeEdges ctx = {ctx | outgoing=getOutgoing reduct} 
+        setData = Lens.modify accessEntity (\e -> {e | value=reduct})
+        updateCtx = setData >> updateNodeEdges
     in Lens.modify accessLayout
     (Graph.update id (Maybe.map updateCtx))
     >> resetForceSim
 
   G.NoUpdate -> identity
 
-
 initializeMachineView : G.RuntimeResult -> MachineView
 initializeMachineView ((machine, machineUpdate) as result) =
   updateMachineView machineUpdate
-  { runtime=result, layout=Graph.empty, forceSim=Force.simulation []
-  , spineTip=Nothing, spineRoot=Nothing
-  }
+  { runtime=result, layout=Graph.empty, forceSim=Force.simulation []}
 
-
+{-| perform the next state transition and update the machine's view
+-}
 stepMachineView : MachineView -> MachineView
 stepMachineView mview =
-  if G.isTermination (Tuple.second mview.runtime)
+  let machineUpdate = Tuple.second mview.runtime in
+  if G.isTermination machineUpdate
   then mview
   else let result = G.step (accessGMachine.get mview)
   in mview
@@ -349,8 +387,8 @@ drawNode ({label} as node) = RSD.svgDrawNode
 -- TODO scale down the arrow stroke width as layout scales
 drawEdge : Edge -> GraphLayout -> Svg msg
 drawEdge ({from, to} as e) layout =
-  let sourceCoords = Graph.get from layout |> Maybe.map (.node >> .label)
-      targetCoords = Graph.get to layout |> Maybe.map (.node >> .label)
+  let sourceCoords = getEntity from layout
+      targetCoords = getEntity to layout
   in case (sourceCoords, targetCoords) of
     (Just source, Just target) -> RSD.svgDrawEdge
       [ RSDA.arrowHead RSDT.Vee, RSDA.linkStyle RSDT.Spline
@@ -400,8 +438,8 @@ translateLayout dx dy =
 drawMachine : G.GMachine -> GraphLayout -> Svg msg
 drawMachine machine layout =
   let
-    width = 500
-    height = 500
+    width = 250
+    height = 300
     stackWidthPct = 0.15 -- pct of width to be taken up by stack
 
     graphWidth = ((1 - stackWidthPct) * width)
@@ -444,16 +482,19 @@ drawPointer {source, target, agletLength} =
       , sourceDimensions=(0,0), targetDimensions=(nodeSize, nodeSize)
       }
 
+{-| draw the machine stack with arrows pointing from stack cells
+to the memory locations (nodes) in the heap graph
+-}
 drawStack : G.GMachine -> GraphLayout -> Float -> Svg msg
 drawStack machine layout cellWidth =
   let
     cellHeight = cellWidth * 0.5
-    cells = List.indexedMap (\i nodeid -> case Graph.get nodeid layout of
-        Just {node} ->
+    cells = List.indexedMap (\i nodeid -> case getEntity nodeid layout of
+        Just {x,y} ->
           [ drawCell 0 (cellHeight * toFloat i) cellWidth cellHeight
           , drawPointer
             { source=(0 + cellWidth/2, cellHeight * toFloat i + cellHeight/2)
-            , target=(node.label.x, node.label.y)
+            , target=(x, y)
             , agletLength=5
             }
           ]
@@ -475,7 +516,7 @@ viewProgram viewport program = case program of
     let code = (accessGMachine.get >> G.getCodePtr) machineView
     in E.row [fillHeight, fillWidth]
       [ E.el [fillHeight, E.width (E.fillPortion 2)] (viewCode code)
-      , E.el [E.width (E.fillPortion 5), E.height (E.maximum viewport.height E.fill)] (viewMachine machineView)
+      , E.el [E.width (E.fillPortion 5), E.height (E.maximum viewport.height E.fill), E.explain Debug.todo] (viewMachine machineView)
       ]
   CompilationError err -> E.text "compilation error"
   Uninitialized -> E.text "Write a program on the left window and hit compile"
@@ -491,11 +532,11 @@ viewCode (Zipper past current rest) =
 view : Model -> E.Element Msg
 view {sourceCode, program, viewport} =
     E.row [fillWidth, fillHeight, Font.family [Font.monospace]]
-    [ E.column [E.width (E.fillPortion 2), fillHeight, E.explain Debug.todo]
+    [ E.column [E.width (E.fillPortion 2), fillHeight]
         [ sourceCodeTextArea sourceCode
         , E.row [] [compileButton, stepButton]
         ]
-    , E.el [E.width (E.fillPortion 5), fillHeight, E.explain Debug.todo]
+    , E.el [E.width (E.fillPortion 5), fillHeight]
       (viewProgram viewport program) 
     ]
 
