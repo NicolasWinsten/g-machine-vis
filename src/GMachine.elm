@@ -68,6 +68,7 @@ type RuntimeError
   | NodeDoesNotExist HeapAddr
   | StackException Int
   | UnexpectedNode HeapAddr
+  | MissingLabel Int
   | CannotSaveFrameWhileUnwinding
 
 {-| each state transition updates the abstract machine somehow.
@@ -84,6 +85,7 @@ type MachineUpdate
   | Unwound HeapAddr -- add force to pull this node to the bottom left
   | RedexRootReplaced HeapAddr GNode
   | Multiple MachineUpdate MachineUpdate
+  | JumpedTo Int
   | NoUpdate -- TODO prune this
 
 {-| the result of a G-machine state transition
@@ -249,6 +251,17 @@ enter global gmachine = case global.code of
     , EnteredCode {functionAddr=fPtr, function=global, args=args}
     )
 
+{-| in the current function code, jump to the numbered label
+-}
+goto : Int -> GMachine -> RuntimeResult
+goto label machine =
+  let newCodePtr = ZipList.goToFirst ((==) (LABEL label)) (getCodePtr machine)
+  in case newCodePtr of
+    Just ptr -> (codePtrLens.set ptr machine, JumpedTo label)
+    Nothing -> (machine, Crash (MissingLabel label))
+
+doNothing : GMachine -> RuntimeResult
+doNothing machine = (machine, NoUpdate)
 
 incNodeCounter : GMachine -> GMachine
 incNodeCounter gmachine = {gmachine | nodeCounter=gmachine.nodeCounter + 1}
@@ -338,7 +351,7 @@ stateTransition instruction gmachine =
       then runWith pushContext (\m _ -> enter global m) gmachine
       else (gmachine, NoUpdate)
 
-    (EVAL, Ok (GInt _), _) -> (gmachine, NoUpdate)
+    (EVAL, Ok (GInt _), _) -> doNothing gmachine
 
     -- travel down the spine of the graph to figure out what to do next
     (UNWIND, Ok (GApp n1 n2), _) -> (push n1 gmachine, Unwound n1)
@@ -425,6 +438,13 @@ stateTransition instruction gmachine =
       getTopVal
       (\topVal m -> (m |> pop (k + 1) >> push topVal, NoUpdate))
       gmachine
+
+    (JUMP label, _, _) -> goto label gmachine
+
+    (LABEL _, _, _) -> (gmachine, NoUpdate)
+
+    (JFALSE label, Ok (GInt val), _) ->
+      if val == 0 then goto label gmachine else doNothing gmachine
 
     -- if we don't know what to do next, then fail returning the node on the top of the stack
     (_, _, _) -> runWith

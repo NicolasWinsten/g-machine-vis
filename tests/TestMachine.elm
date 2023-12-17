@@ -123,3 +123,25 @@ main = 1 - 2 - 3 == double (negate 2)
     """
     (TInt 1)
 
+simpleIfStatement : Test
+simpleIfStatement = testRun
+    """
+main = if 1 10 99
+    """
+    (TInt 10)
+
+simpleIfStatement2 : Test
+simpleIfStatement2 = testRun
+    """
+main = if 0 10 99
+    """
+    (TInt 99)
+
+complexIf : Test
+complexIf = testRun
+    """
+square n = n * n
+main = if (1 == 0) 8 (square (if 1 9 0)) 
+    """
+    (TInt 81)
+

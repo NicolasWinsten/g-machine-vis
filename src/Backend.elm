@@ -11,7 +11,6 @@ import Basics.Extra exposing (uncurry)
 import List.Nonempty exposing (Nonempty(..))
 import Render.StandardDrawers.Types exposing (ArrowHeadShape(..))
 import List.Nonempty as Nonempty
-
 type alias Name = String
 
 {-| instructions for the abstract GMachine
@@ -47,6 +46,9 @@ type GCode
   | MKAP
   | SLIDE Int
   | ADD | SUB | MUL | DIV | EQU
+  | LABEL Int
+  | JFALSE Int
+  | JUMP Int
 
 gCodeToString : GCode -> String
 gCodeToString instruction = case instruction of
@@ -66,6 +68,9 @@ gCodeToString instruction = case instruction of
   MUL             -> "MUL"
   DIV             -> "DIV"
   EQU             -> "EQU"
+  LABEL l         -> "LABEL " ++ String.fromInt l
+  JFALSE l        -> "JFALSE " ++ String.fromInt l
+  JUMP l          -> "JUMP " ++ String.fromInt l
 
 type alias Global = {name : Name, numFormals : Int, code : Nonempty GCode}
 
@@ -87,16 +92,27 @@ defineGlobal global env = case getGlobal global.name env of
   Nothing -> Ok <| Dict.insert global.name global env
 
 
+-- BUILTIN FUNCTIONS
+plusInt   = Global "+" 2 <| Nonempty (PUSHARG 2) [EVAL, PUSHARG 2, EVAL, ADD, UPDATE 3, POP 2, UNWIND]
+minusInt  = Global "-" 2 <| Nonempty (PUSHARG 2) [EVAL, PUSHARG 2, EVAL, SUB, UPDATE 3, POP 2, UNWIND]
+multInt   = Global "*" 2 <| Nonempty (PUSHARG 2) [EVAL, PUSHARG 2, EVAL, MUL, UPDATE 3, POP 2, UNWIND]
+divInt    = Global "/" 2 <| Nonempty (PUSHARG 2) [EVAL, PUSHARG 2, EVAL, DIV, UPDATE 3, POP 2, UNWIND] 
+equ       = Global "==" 2 <| Nonempty (PUSHARG 2) [EVAL, PUSHARG 2, EVAL, EQU, UPDATE 3, POP 2, UNWIND]
+
+if_ = Global "if" 3
+  <| Nonempty (PUSHARG 1) 
+  [ EVAL, JFALSE 1
+  , PUSHARG 3, JUMP 2
+  , LABEL 1, PUSHARG 4
+  , LABEL 2, EVAL, UPDATE 5, POP 4
+  , UNWIND
+  ]
+
 stdLib : Env
 stdLib = List.foldl
   (\def -> Dict.insert def.name def)
   emptyEnv
-  [ Global "+" 2 <| Nonempty (PUSHARG 2) [EVAL, PUSHARG 2, EVAL, ADD, UPDATE 3, POP 2, UNWIND]
-  , Global "-" 2 <| Nonempty (PUSHARG 2) [EVAL, PUSHARG 2, EVAL, SUB, UPDATE 3, POP 2, UNWIND]
-  , Global "*" 2 <| Nonempty (PUSHARG 2) [EVAL, PUSHARG 2, EVAL, MUL, UPDATE 3, POP 2, UNWIND]
-  , Global "/" 2 <| Nonempty (PUSHARG 2) [EVAL, PUSHARG 2, EVAL, DIV, UPDATE 3, POP 2, UNWIND]
-  , Global "==" 2 <| Nonempty (PUSHARG 2) [EVAL, PUSHARG 2, EVAL, EQU, UPDATE 3, POP 2, UNWIND]
-  ]
+  [ plusInt, minusInt, multInt, divInt, equ, if_ ]
 
 compileASTs : List SuperCombinator -> Result CompilerError Env
 compileASTs = List.foldl

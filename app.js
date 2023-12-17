@@ -13780,16 +13780,131 @@ var $author$project$GMachine$mkNodeAndPush = F2(
 				$author$project$GMachine$incNodeCounter(
 					A3($author$project$GMachine$updatePointer, nodeId, node, gmachine))));
 	});
-var $author$project$Backend$ADD = {$: 'ADD'};
 var $author$project$Backend$DIV = {$: 'DIV'};
-var $author$project$Backend$EQU = {$: 'EQU'};
 var $author$project$Backend$EVAL = {$: 'EVAL'};
 var $author$project$Backend$Global = F3(
 	function (name, numFormals, code) {
 		return {code: code, name: name, numFormals: numFormals};
 	});
-var $author$project$Backend$MUL = {$: 'MUL'};
+var $author$project$Backend$divInt = A3(
+	$author$project$Backend$Global,
+	'/',
+	2,
+	A2(
+		$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
+		$author$project$Backend$PUSHARG(2),
+		_List_fromArray(
+			[
+				$author$project$Backend$EVAL,
+				$author$project$Backend$PUSHARG(2),
+				$author$project$Backend$EVAL,
+				$author$project$Backend$DIV,
+				$author$project$Backend$UPDATE(3),
+				$author$project$Backend$POP(2),
+				$author$project$Backend$UNWIND
+			])));
+var $author$project$Backend$EQU = {$: 'EQU'};
+var $author$project$Backend$equ = A3(
+	$author$project$Backend$Global,
+	'==',
+	2,
+	A2(
+		$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
+		$author$project$Backend$PUSHARG(2),
+		_List_fromArray(
+			[
+				$author$project$Backend$EVAL,
+				$author$project$Backend$PUSHARG(2),
+				$author$project$Backend$EVAL,
+				$author$project$Backend$EQU,
+				$author$project$Backend$UPDATE(3),
+				$author$project$Backend$POP(2),
+				$author$project$Backend$UNWIND
+			])));
+var $author$project$Backend$JFALSE = function (a) {
+	return {$: 'JFALSE', a: a};
+};
+var $author$project$Backend$JUMP = function (a) {
+	return {$: 'JUMP', a: a};
+};
+var $author$project$Backend$LABEL = function (a) {
+	return {$: 'LABEL', a: a};
+};
+var $author$project$Backend$if_ = A3(
+	$author$project$Backend$Global,
+	'if',
+	3,
+	A2(
+		$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
+		$author$project$Backend$PUSHARG(1),
+		_List_fromArray(
+			[
+				$author$project$Backend$EVAL,
+				$author$project$Backend$JFALSE(1),
+				$author$project$Backend$PUSHARG(3),
+				$author$project$Backend$JUMP(2),
+				$author$project$Backend$LABEL(1),
+				$author$project$Backend$PUSHARG(4),
+				$author$project$Backend$LABEL(2),
+				$author$project$Backend$EVAL,
+				$author$project$Backend$UPDATE(5),
+				$author$project$Backend$POP(4),
+				$author$project$Backend$UNWIND
+			])));
 var $author$project$Backend$SUB = {$: 'SUB'};
+var $author$project$Backend$minusInt = A3(
+	$author$project$Backend$Global,
+	'-',
+	2,
+	A2(
+		$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
+		$author$project$Backend$PUSHARG(2),
+		_List_fromArray(
+			[
+				$author$project$Backend$EVAL,
+				$author$project$Backend$PUSHARG(2),
+				$author$project$Backend$EVAL,
+				$author$project$Backend$SUB,
+				$author$project$Backend$UPDATE(3),
+				$author$project$Backend$POP(2),
+				$author$project$Backend$UNWIND
+			])));
+var $author$project$Backend$MUL = {$: 'MUL'};
+var $author$project$Backend$multInt = A3(
+	$author$project$Backend$Global,
+	'*',
+	2,
+	A2(
+		$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
+		$author$project$Backend$PUSHARG(2),
+		_List_fromArray(
+			[
+				$author$project$Backend$EVAL,
+				$author$project$Backend$PUSHARG(2),
+				$author$project$Backend$EVAL,
+				$author$project$Backend$MUL,
+				$author$project$Backend$UPDATE(3),
+				$author$project$Backend$POP(2),
+				$author$project$Backend$UNWIND
+			])));
+var $author$project$Backend$ADD = {$: 'ADD'};
+var $author$project$Backend$plusInt = A3(
+	$author$project$Backend$Global,
+	'+',
+	2,
+	A2(
+		$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
+		$author$project$Backend$PUSHARG(2),
+		_List_fromArray(
+			[
+				$author$project$Backend$EVAL,
+				$author$project$Backend$PUSHARG(2),
+				$author$project$Backend$EVAL,
+				$author$project$Backend$ADD,
+				$author$project$Backend$UPDATE(3),
+				$author$project$Backend$POP(2),
+				$author$project$Backend$UNWIND
+			])));
 var $author$project$Backend$stdLib = A3(
 	$elm$core$List$foldl,
 	function (def) {
@@ -13797,93 +13912,7 @@ var $author$project$Backend$stdLib = A3(
 	},
 	$author$project$Backend$emptyEnv,
 	_List_fromArray(
-		[
-			A3(
-			$author$project$Backend$Global,
-			'+',
-			2,
-			A2(
-				$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
-				$author$project$Backend$PUSHARG(2),
-				_List_fromArray(
-					[
-						$author$project$Backend$EVAL,
-						$author$project$Backend$PUSHARG(2),
-						$author$project$Backend$EVAL,
-						$author$project$Backend$ADD,
-						$author$project$Backend$UPDATE(3),
-						$author$project$Backend$POP(2),
-						$author$project$Backend$UNWIND
-					]))),
-			A3(
-			$author$project$Backend$Global,
-			'-',
-			2,
-			A2(
-				$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
-				$author$project$Backend$PUSHARG(2),
-				_List_fromArray(
-					[
-						$author$project$Backend$EVAL,
-						$author$project$Backend$PUSHARG(2),
-						$author$project$Backend$EVAL,
-						$author$project$Backend$SUB,
-						$author$project$Backend$UPDATE(3),
-						$author$project$Backend$POP(2),
-						$author$project$Backend$UNWIND
-					]))),
-			A3(
-			$author$project$Backend$Global,
-			'*',
-			2,
-			A2(
-				$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
-				$author$project$Backend$PUSHARG(2),
-				_List_fromArray(
-					[
-						$author$project$Backend$EVAL,
-						$author$project$Backend$PUSHARG(2),
-						$author$project$Backend$EVAL,
-						$author$project$Backend$MUL,
-						$author$project$Backend$UPDATE(3),
-						$author$project$Backend$POP(2),
-						$author$project$Backend$UNWIND
-					]))),
-			A3(
-			$author$project$Backend$Global,
-			'/',
-			2,
-			A2(
-				$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
-				$author$project$Backend$PUSHARG(2),
-				_List_fromArray(
-					[
-						$author$project$Backend$EVAL,
-						$author$project$Backend$PUSHARG(2),
-						$author$project$Backend$EVAL,
-						$author$project$Backend$DIV,
-						$author$project$Backend$UPDATE(3),
-						$author$project$Backend$POP(2),
-						$author$project$Backend$UNWIND
-					]))),
-			A3(
-			$author$project$Backend$Global,
-			'==',
-			2,
-			A2(
-				$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
-				$author$project$Backend$PUSHARG(2),
-				_List_fromArray(
-					[
-						$author$project$Backend$EVAL,
-						$author$project$Backend$PUSHARG(2),
-						$author$project$Backend$EVAL,
-						$author$project$Backend$EQU,
-						$author$project$Backend$UPDATE(3),
-						$author$project$Backend$POP(2),
-						$author$project$Backend$UNWIND
-					])))
-		]));
+		[$author$project$Backend$plusInt, $author$project$Backend$minusInt, $author$project$Backend$multInt, $author$project$Backend$divInt, $author$project$Backend$equ, $author$project$Backend$if_]));
 var $author$project$GMachine$setup = F2(
 	function (env, mainFunction) {
 		return A2(
@@ -13961,33 +13990,6 @@ var $author$project$Main$nodeToEntity = A2(
 				{label: e});
 		}));
 var $author$project$Main$accessEntity = A2($arturopala$elm_monocle$Monocle$Lens$compose, $author$project$Main$accessNode, $author$project$Main$nodeToEntity);
-var $author$project$Main$accessLayout = A2(
-	$arturopala$elm_monocle$Monocle$Lens$Lens,
-	function ($) {
-		return $.layout;
-	},
-	F2(
-		function (l, m) {
-			return _Utils_update(
-				m,
-				{layout: l});
-		}));
-var $gampleman$elm_visualization$Force$State = function (a) {
-	return {$: 'State', a: a};
-};
-var $elm$core$Basics$pow = _Basics_pow;
-var $gampleman$elm_visualization$Force$simulation = function (forces) {
-	return $gampleman$elm_visualization$Force$State(
-		{
-			alpha: 1.0,
-			alphaDecay: 1 - A2($elm$core$Basics$pow, 0.001, 1 / 300),
-			alphaTarget: 0.0,
-			forces: forces,
-			minAlpha: 0.001,
-			velocityDecay: 0.6
-		});
-};
-var $author$project$GMachine$GHole = {$: 'GHole'};
 var $author$project$Main$accessLayout = A2(
 	$arturopala$elm_monocle$Monocle$Lens$Lens,
 	function ($) {
@@ -16508,6 +16510,8 @@ var $author$project$Main$updateMachineView = function (machineUpdate) {
 						id,
 						$elm$core$Maybe$map(updateCtx))),
 				$author$project$Main$resetForceSim);
+		case 'JumpedTo':
+			return $elm$core$Basics$identity;
 		default:
 			return $elm$core$Basics$identity;
 	}
@@ -16545,7 +16549,7 @@ var $author$project$Main$compileSourceCode = function (sourceCode) {
 		$author$project$GMachine$createMachine(sourceCode));
 };
 var $elm$browser$Browser$Dom$getViewport = _Browser_withWindow(_Browser_getViewport);
-var $author$project$Main$initialProgram = '\ndouble x = x + x\n\ntwice f x = f (f x)\n\nmain = twice double 2\n';
+var $author$project$Main$initialProgram = '\ntwice f x = f (f x)\ndouble x = x * 2\n\nmain = if (twice double 2 == 8) 1 0\n';
 var $elm$core$Basics$round = _Basics_round;
 var $author$project$Main$init = _Utils_Tuple2(
 	A2(
@@ -22954,6 +22958,98 @@ var $elm_community$result_extra$Result$Extra$combineMapBoth = F2(
 			$elm_community$result_extra$Result$Extra$combineBoth,
 			A2($elm$core$Tuple$mapBoth, f, g));
 	});
+var $author$project$GMachine$doNothing = function (machine) {
+	return _Utils_Tuple2(machine, $author$project$GMachine$NoUpdate);
+};
+var $author$project$GMachine$JumpedTo = function (a) {
+	return {$: 'JumpedTo', a: a};
+};
+var $author$project$GMachine$MissingLabel = function (a) {
+	return {$: 'MissingLabel', a: a};
+};
+var $staeter$ziplist$ZipList$goToNextSub = F2(
+	function (condition, zipList) {
+		goToNextSub:
+		while (true) {
+			var _v0 = zipList;
+			var after = _v0.c;
+			if (A2($elm$core$List$any, condition, after)) {
+				var $temp$condition = condition,
+					$temp$zipList = $staeter$ziplist$ZipList$forward(zipList);
+				condition = $temp$condition;
+				zipList = $temp$zipList;
+				continue goToNextSub;
+			} else {
+				return zipList;
+			}
+		}
+	});
+var $staeter$ziplist$ZipList$goToNext = F2(
+	function (condition, zipList) {
+		var _v0 = zipList;
+		var after = _v0.c;
+		return A2($elm$core$List$any, condition, after) ? $elm$core$Maybe$Just(
+			A2(
+				$staeter$ziplist$ZipList$goToNextSub,
+				condition,
+				$staeter$ziplist$ZipList$forward(zipList))) : $elm$core$Maybe$Nothing;
+	});
+var $staeter$ziplist$ZipList$backward = function (zipList) {
+	var _v0 = zipList;
+	var before = _v0.a;
+	var elem = _v0.b;
+	var after = _v0.c;
+	if (!before.b) {
+		return zipList;
+	} else {
+		var head = before.a;
+		var queue = before.b;
+		return A3(
+			$staeter$ziplist$ZipList$Zipper,
+			queue,
+			head,
+			A2($elm$core$List$cons, elem, after));
+	}
+};
+var $staeter$ziplist$ZipList$goToStart = function (zipList) {
+	var _v0 = zipList;
+	var before = _v0.a;
+	if (!before.b) {
+		return zipList;
+	} else {
+		return $staeter$ziplist$ZipList$goToStart(
+			$staeter$ziplist$ZipList$backward(zipList));
+	}
+};
+var $staeter$ziplist$ZipList$isCurrent = F2(
+	function (condition, _v0) {
+		var elem = _v0.b;
+		return condition(elem);
+	});
+var $staeter$ziplist$ZipList$goToFirst = F2(
+	function (condition, zipList) {
+		var newZipList = $staeter$ziplist$ZipList$goToStart(zipList);
+		return A2($staeter$ziplist$ZipList$isCurrent, condition, newZipList) ? $elm$core$Maybe$Just(newZipList) : A2($staeter$ziplist$ZipList$goToNext, condition, newZipList);
+	});
+var $author$project$GMachine$goto = F2(
+	function (label, machine) {
+		var newCodePtr = A2(
+			$staeter$ziplist$ZipList$goToFirst,
+			$elm$core$Basics$eq(
+				$author$project$Backend$LABEL(label)),
+			$author$project$GMachine$getCodePtr(machine));
+		if (newCodePtr.$ === 'Just') {
+			var ptr = newCodePtr.a;
+			return _Utils_Tuple2(
+				A2($author$project$GMachine$codePtrLens.set, ptr, machine),
+				$author$project$GMachine$JumpedTo(label));
+		} else {
+			return _Utils_Tuple2(
+				machine,
+				$author$project$GMachine$Crash(
+					$author$project$GMachine$MissingLabel(label)));
+		}
+	});
 var $author$project$GMachine$pop = function (num) {
 	return A2(
 		$arturopala$elm_monocle$Monocle$Lens$modify,
@@ -23070,7 +23166,7 @@ var $author$project$GMachine$stateTransition = F2(
 		var topMostNode = A2($author$project$GMachine$loadStackPointer, 0, gmachine);
 		var sndTopMostNode = A2($author$project$GMachine$loadStackPointer, 1, gmachine);
 		var _v0 = _Utils_Tuple3(instruction, topMostNode, sndTopMostNode);
-		_v0$20:
+		_v0$23:
 		while (true) {
 			switch (_v0.a.$) {
 				case 'PUSHGLOBAL':
@@ -23110,12 +23206,12 @@ var $author$project$GMachine$stateTransition = F2(
 									gmachine) : _Utils_Tuple2(gmachine, $author$project$GMachine$NoUpdate);
 							case 'GInt':
 								var _v6 = _v0.a;
-								return _Utils_Tuple2(gmachine, $author$project$GMachine$NoUpdate);
+								return $author$project$GMachine$doNothing(gmachine);
 							default:
-								break _v0$20;
+								break _v0$23;
 						}
 					} else {
-						break _v0$20;
+						break _v0$23;
 					}
 				case 'UNWIND':
 					if (_v0.b.$ === 'Ok') {
@@ -23144,10 +23240,10 @@ var $author$project$GMachine$stateTransition = F2(
 								var _v10 = _v0.a;
 								return A3($author$project$GMachine$runWith, $author$project$GMachine$getTopVal, $author$project$GMachine$return, gmachine);
 							default:
-								break _v0$20;
+								break _v0$23;
 						}
 					} else {
-						break _v0$20;
+						break _v0$23;
 					}
 				case 'UPDATE':
 					if (_v0.b.$ === 'Ok') {
@@ -23168,7 +23264,7 @@ var $author$project$GMachine$stateTransition = F2(
 								}),
 							gmachine);
 					} else {
-						break _v0$20;
+						break _v0$23;
 					}
 				case 'POP':
 					var k = _v0.a.a;
@@ -23253,7 +23349,7 @@ var $author$project$GMachine$stateTransition = F2(
 							$author$project$GMachine$GInt(x + y),
 							A2($author$project$GMachine$pop, 2, gmachine));
 					} else {
-						break _v0$20;
+						break _v0$23;
 					}
 				case 'SUB':
 					if ((((_v0.b.$ === 'Ok') && (_v0.b.a.$ === 'GInt')) && (_v0.c.$ === 'Ok')) && (_v0.c.a.$ === 'GInt')) {
@@ -23265,7 +23361,7 @@ var $author$project$GMachine$stateTransition = F2(
 							$author$project$GMachine$GInt(x - y),
 							A2($author$project$GMachine$pop, 2, gmachine));
 					} else {
-						break _v0$20;
+						break _v0$23;
 					}
 				case 'MUL':
 					if ((((_v0.b.$ === 'Ok') && (_v0.b.a.$ === 'GInt')) && (_v0.c.$ === 'Ok')) && (_v0.c.a.$ === 'GInt')) {
@@ -23277,7 +23373,7 @@ var $author$project$GMachine$stateTransition = F2(
 							$author$project$GMachine$GInt(x * y),
 							A2($author$project$GMachine$pop, 2, gmachine));
 					} else {
-						break _v0$20;
+						break _v0$23;
 					}
 				case 'DIV':
 					if ((((_v0.b.$ === 'Ok') && (_v0.b.a.$ === 'GInt')) && (_v0.c.$ === 'Ok')) && (_v0.c.a.$ === 'GInt')) {
@@ -23289,7 +23385,7 @@ var $author$project$GMachine$stateTransition = F2(
 							$author$project$GMachine$GInt((x / y) | 0),
 							A2($author$project$GMachine$pop, 2, gmachine));
 					} else {
-						break _v0$20;
+						break _v0$23;
 					}
 				case 'EQU':
 					if ((((_v0.b.$ === 'Ok') && (_v0.b.a.$ === 'GInt')) && (_v0.c.$ === 'Ok')) && (_v0.c.a.$ === 'GInt')) {
@@ -23302,9 +23398,9 @@ var $author$project$GMachine$stateTransition = F2(
 								_Utils_eq(x, y) ? 1 : 0),
 							A2($author$project$GMachine$pop, 2, gmachine));
 					} else {
-						break _v0$20;
+						break _v0$23;
 					}
-				default:
+				case 'SLIDE':
 					var k = _v0.a.a;
 					return A3(
 						$author$project$GMachine$runWith,
@@ -23320,6 +23416,19 @@ var $author$project$GMachine$stateTransition = F2(
 									$author$project$GMachine$NoUpdate);
 							}),
 						gmachine);
+				case 'JUMP':
+					var label = _v0.a.a;
+					return A2($author$project$GMachine$goto, label, gmachine);
+				case 'LABEL':
+					return _Utils_Tuple2(gmachine, $author$project$GMachine$NoUpdate);
+				default:
+					if ((_v0.b.$ === 'Ok') && (_v0.b.a.$ === 'GInt')) {
+						var label = _v0.a.a;
+						var val = _v0.b.a.a;
+						return (!val) ? A2($author$project$GMachine$goto, label, gmachine) : $author$project$GMachine$doNothing(gmachine);
+					} else {
+						break _v0$23;
+					}
 			}
 		}
 		return A3(
@@ -26279,8 +26388,17 @@ var $author$project$Backend$gCodeToString = function (instruction) {
 			return 'MUL';
 		case 'DIV':
 			return 'DIV';
-		default:
+		case 'EQU':
 			return 'EQU';
+		case 'LABEL':
+			var l = instruction.a;
+			return 'LABEL ' + $elm$core$String$fromInt(l);
+		case 'JFALSE':
+			var l = instruction.a;
+			return 'JFALSE ' + $elm$core$String$fromInt(l);
+		default:
+			var l = instruction.a;
+			return 'JUMP ' + $elm$core$String$fromInt(l);
 	}
 };
 var $phollyer$elm_ui_colors$Colors$Opaque$lime = A3($mdgriffith$elm_ui$Element$rgb255, 0, 255, 0);
@@ -30447,8 +30565,8 @@ var $author$project$Main$viewProgram = F2(
 									_Debug_todo(
 										'Main',
 										{
-											start: {line: 573, column: 97},
-											end: {line: 573, column: 107}
+											start: {line: 574, column: 97},
+											end: {line: 574, column: 107}
 										}))
 								]),
 							$author$project$Main$viewMachine(machineView))

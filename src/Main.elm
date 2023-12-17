@@ -260,6 +260,8 @@ updateMachineView machineUpdate = case machineUpdate of
     in Lens.modify accessLayout
     (Graph.update id (Maybe.map updateCtx))
     >> resetForceSim
+  
+  G.JumpedTo _ -> identity
 
   G.NoUpdate -> identity
 
@@ -283,11 +285,10 @@ stepMachineView mview =
 
 initialProgram =
   """
-double x = x + x
-
 twice f x = f (f x)
+double x = x * 2
 
-main = twice double 2
+main = if (twice double 2 == 8) 1 0
 """
 
 compileSourceCode : String -> Model -> Model
