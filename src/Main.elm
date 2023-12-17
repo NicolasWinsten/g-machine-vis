@@ -17,7 +17,7 @@ import TypedSvg as Svg
 import TypedSvg.Attributes as SvgA
 import TypedSvg.Types as SvgT
 import Result.Extra
-import Basics.Extra exposing (flip)
+import Basics.Extra exposing (flip, atMost, atLeast)
 import Backend
 import Dict exposing (Dict)
 import Html.Attributes
@@ -34,7 +34,7 @@ import Tree exposing (Tree(..))
 import Set exposing (Set)
 import Graph
 import Hierarchy
-import Tree exposing (children)
+import Tree
 import Math.Vector2 as Vec
 
 {-| each node in the graph's heap will be given an entity in a force simulation
@@ -168,10 +168,18 @@ hierarchicalLayout machine layout =
 resetForceSim : MachineView -> MachineView
 resetForceSim mview =
   let hierarchy = hierarchicalLayout (accessGMachine.get mview) mview.layout
+      
+      -- center the hierarchical layout around (0,0)
+      (sumX, sumY) = Dict.foldl
+        (\_ (x,y) (sx, sy) -> (x + sx, y + sy))
+        (0,0)
+        hierarchy.placements
+      placedNodes = Dict.size hierarchy.placements
+      (avgX, avgY) = (sumX / toFloat placedNodes, sumY / toFloat placedNodes)
       -- push nodes in the redex tree towards their hierarchical position
       (hierarchyXs, hierarchyYs) = Dict.foldl
         (\node (x,y) (xs, ys) ->
-          ({node=node, strength=0.5, target=x} :: xs, {node=node, strength=0.5, target=y} :: ys)
+          ({node=node, strength=0.5, target=x-avgX} :: xs, {node=node, strength=0.5, target=y-avgY} :: ys)
         )
         ([],[])
         hierarchy.placements
@@ -179,7 +187,7 @@ resetForceSim mview =
       
       -- gravitate all nodes towards center to mitigate fly away
       gravitateNodes = List.map
-        (\id -> {node=id, strength=0.01, target=0})
+        (\id -> {node=id, strength=0.05, target=0})
         (Graph.nodeIds mview.layout)
   in
   { mview
@@ -386,8 +394,10 @@ avgDirOfIncomingEdges id layout =
         (\e -> edgeDirection e layout)
         (getIncomingEdges id layout)
       
+      numEdges = List.length directions |> atLeast 1
+      
       avgDir = List.foldl Vec.add (Vec.vec2 0 0) directions
-        |> Vec.scale (1 / toFloat (List.length directions))
+        |> Vec.scale (1 / toFloat numEdges)
   in Vec.toRecord avgDir
 
 
@@ -473,17 +483,17 @@ layoutDimensions layout =
   in {width=maxX - minX + nodeSize, height=maxY - minY + nodeSize}
 
 {-| scale the layout to fit the new dimensions, assuming the layout is centered at (0,0) -}
--- fitLayout : Float -> Float -> GraphLayout -> GraphLayout
--- fitLayout w h layout =
---   let {width, height} = layoutDimensions layout
---       scaleX = w / width 
---       scaleY = h / height 
---   in scaleLayout scaleX scaleY layout
+fitLayout : Float -> Float -> GraphLayout -> GraphLayout
+fitLayout w h layout =
+  let {width, height} = layoutDimensions layout
+      scaleX = w / width |> atMost 1
+      scaleY = h / height |> atMost 1
+  in scaleLayout scaleX scaleY layout
 
--- scaleLayout : Float -> Float -> GraphLayout -> GraphLayout
--- scaleLayout sx sy =
---   let scale n = {n | x=n.x * sx, y=n.y * sy}
---   in Graph.mapNodes scale
+scaleLayout : Float -> Float -> GraphLayout -> GraphLayout
+scaleLayout sx sy =
+  let scale n = {n | x=n.x * sx, y=n.y * sy}
+  in Graph.mapNodes scale
 
 translateLayout : Float -> Float -> GraphLayout -> GraphLayout
 translateLayout dx dy =
@@ -496,11 +506,11 @@ drawMachine machine layout =
     width = 250
     height = 300
     stackWidthPct = 0.15 -- pct of width to be taken up by stack
-
-    graphWidth = ((1 - stackWidthPct) * width)
+    stackWidth = width * stackWidthPct
+    graphWidth = width - stackWidth
     layout_ = layout
-        -- |> fitLayout graphWidth height
-        |> translateLayout (width/2) (height/2)
+        |> fitLayout graphWidth height
+        |> translateLayout (stackWidth + graphWidth/2) (height/2)
 
   in Svg.svg
     [ SvgA.viewBox 0 0 width height
@@ -509,7 +519,7 @@ drawMachine machine layout =
     , Html.Attributes.style "border" "solid"
     ]
     [ drawGraph layout_
-    , drawStack machine layout_ (stackWidthPct * width)
+    , drawStack machine layout_ stackWidth
     ]
 
 

@@ -16248,42 +16248,60 @@ var $author$project$Main$resetForceSim = function (mview) {
 		$author$project$Main$hierarchicalLayout,
 		$author$project$Main$accessGMachine.get(mview),
 		mview.layout);
+	var placedNodes = $elm$core$Dict$size(hierarchy.placements);
 	var gravitateNodes = A2(
 		$elm$core$List$map,
 		function (id) {
-			return {node: id, strength: 0.01, target: 0};
+			return {node: id, strength: 0.05, target: 0};
 		},
 		$elm_community$graph$Graph$nodeIds(mview.layout));
 	var edges = A2(
 		$elm$core$List$map,
-		function (_v3) {
-			var from = _v3.from;
-			var to = _v3.to;
+		function (_v8) {
+			var from = _v8.from;
+			var to = _v8.to;
 			return _Utils_Tuple2(from, to);
 		},
 		$elm_community$graph$Graph$edges(mview.layout));
 	var _v0 = A3(
 		$elm$core$Dict$foldl,
 		F3(
-			function (node, _v1, _v2) {
-				var x = _v1.a;
-				var y = _v1.b;
-				var xs = _v2.a;
-				var ys = _v2.b;
+			function (_v1, _v2, _v3) {
+				var x = _v2.a;
+				var y = _v2.b;
+				var sx = _v3.a;
+				var sy = _v3.b;
+				return _Utils_Tuple2(x + sx, y + sy);
+			}),
+		_Utils_Tuple2(0, 0),
+		hierarchy.placements);
+	var sumX = _v0.a;
+	var sumY = _v0.b;
+	var _v4 = _Utils_Tuple2(sumX / placedNodes, sumY / placedNodes);
+	var avgX = _v4.a;
+	var avgY = _v4.b;
+	var _v5 = A3(
+		$elm$core$Dict$foldl,
+		F3(
+			function (node, _v6, _v7) {
+				var x = _v6.a;
+				var y = _v6.b;
+				var xs = _v7.a;
+				var ys = _v7.b;
 				return _Utils_Tuple2(
 					A2(
 						$elm$core$List$cons,
-						{node: node, strength: 0.5, target: x},
+						{node: node, strength: 0.5, target: x - avgX},
 						xs),
 					A2(
 						$elm$core$List$cons,
-						{node: node, strength: 0.5, target: y},
+						{node: node, strength: 0.5, target: y - avgY},
 						ys));
 			}),
 		_Utils_Tuple2(_List_Nil, _List_Nil),
 		hierarchy.placements);
-	var hierarchyXs = _v0.a;
-	var hierarchyYs = _v0.b;
+	var hierarchyXs = _v5.a;
+	var hierarchyYs = _v5.b;
 	return _Utils_update(
 		mview,
 		{
@@ -30124,6 +30142,7 @@ var $elm_community$typed_svg$TypedSvg$Types$Rotate = F3(
 var $elm_community$typed_svg$TypedSvg$Types$AnchorEnd = {$: 'AnchorEnd'};
 var $elm_community$typed_svg$TypedSvg$Types$AnchorStart = {$: 'AnchorStart'};
 var $elm_explorations$linear_algebra$Math$Vector2$add = _MJS_v2add;
+var $elm_community$basics_extra$Basics$Extra$atLeast = $elm$core$Basics$max;
 var $elm_explorations$linear_algebra$Math$Vector2$direction = _MJS_v2direction;
 var $elm_explorations$linear_algebra$Math$Vector2$vec2 = _MJS_v2;
 var $author$project$Main$edgeDirection = F2(
@@ -30168,9 +30187,13 @@ var $author$project$Main$avgDirOfIncomingEdges = F2(
 				return A2($author$project$Main$edgeDirection, e, layout);
 			},
 			A2($author$project$Main$getIncomingEdges, id, layout));
+		var numEdges = A2(
+			$elm_community$basics_extra$Basics$Extra$atLeast,
+			1,
+			$elm$core$List$length(directions));
 		var avgDir = A2(
 			$elm_explorations$linear_algebra$Math$Vector2$scale,
-			1 / $elm$core$List$length(directions),
+			1 / numEdges,
 			A3(
 				$elm$core$List$foldl,
 				$elm_explorations$linear_algebra$Math$Vector2$add,
@@ -30388,7 +30411,51 @@ var $author$project$Main$drawStack = F3(
 					$author$project$GMachine$getStack(machine))));
 		return A2($elm_community$typed_svg$TypedSvg$g, _List_Nil, cells);
 	});
-var $elm_community$typed_svg$TypedSvg$svg = $elm_community$typed_svg$TypedSvg$Core$node('svg');
+var $elm_community$basics_extra$Basics$Extra$atMost = $elm$core$Basics$min;
+var $author$project$Main$layoutDimensions = function (layout) {
+	var min = A2(
+		$elm$core$Basics$composeR,
+		$elm$core$List$minimum,
+		$elm$core$Maybe$withDefault(0));
+	var max = A2(
+		$elm$core$Basics$composeR,
+		$elm$core$List$maximum,
+		$elm$core$Maybe$withDefault(0));
+	var entities = $elm_community$graph$Graph$nodes(layout);
+	var xvals = A2(
+		$elm$core$List$map,
+		A2(
+			$elm$core$Basics$composeR,
+			function ($) {
+				return $.label;
+			},
+			function ($) {
+				return $.x;
+			}),
+		entities);
+	var yvals = A2(
+		$elm$core$List$map,
+		A2(
+			$elm$core$Basics$composeR,
+			function ($) {
+				return $.label;
+			},
+			function ($) {
+				return $.x;
+			}),
+		entities);
+	var _v0 = _Utils_Tuple2(
+		max(yvals),
+		min(yvals));
+	var maxY = _v0.a;
+	var minY = _v0.b;
+	var _v1 = _Utils_Tuple2(
+		max(xvals),
+		min(xvals));
+	var maxX = _v1.a;
+	var minX = _v1.b;
+	return {height: (maxY - minY) + $author$project$Main$nodeSize, width: (maxX - minX) + $author$project$Main$nodeSize};
+};
 var $elm_community$intdict$IntDict$findMax = function (dict) {
 	findMax:
 	while (true) {
@@ -30491,6 +30558,25 @@ var $elm_community$graph$Graph$mapNodes = function (f) {
 		},
 		$elm_community$graph$Graph$empty);
 };
+var $author$project$Main$scaleLayout = F2(
+	function (sx, sy) {
+		var scale = function (n) {
+			return _Utils_update(
+				n,
+				{x: n.x * sx, y: n.y * sy});
+		};
+		return $elm_community$graph$Graph$mapNodes(scale);
+	});
+var $author$project$Main$fitLayout = F3(
+	function (w, h, layout) {
+		var _v0 = $author$project$Main$layoutDimensions(layout);
+		var width = _v0.width;
+		var height = _v0.height;
+		var scaleY = A2($elm_community$basics_extra$Basics$Extra$atMost, 1, h / height);
+		var scaleX = A2($elm_community$basics_extra$Basics$Extra$atMost, 1, w / width);
+		return A3($author$project$Main$scaleLayout, scaleX, scaleY, layout);
+	});
+var $elm_community$typed_svg$TypedSvg$svg = $elm_community$typed_svg$TypedSvg$Core$node('svg');
 var $author$project$Main$translateLayout = F2(
 	function (dx, dy) {
 		var translate = function (n) {
@@ -30504,9 +30590,14 @@ var $author$project$Main$drawMachine = F2(
 	function (machine, layout) {
 		var width = 250;
 		var stackWidthPct = 0.15;
+		var stackWidth = width * stackWidthPct;
 		var height = 300;
-		var layout_ = A3($author$project$Main$translateLayout, width / 2, height / 2, layout);
-		var graphWidth = (1 - stackWidthPct) * width;
+		var graphWidth = width - stackWidth;
+		var layout_ = A3(
+			$author$project$Main$translateLayout,
+			stackWidth + (graphWidth / 2),
+			height / 2,
+			A3($author$project$Main$fitLayout, graphWidth, height, layout));
 		return A2(
 			$elm_community$typed_svg$TypedSvg$svg,
 			_List_fromArray(
@@ -30519,7 +30610,7 @@ var $author$project$Main$drawMachine = F2(
 			_List_fromArray(
 				[
 					$author$project$Main$drawGraph(layout_),
-					A3($author$project$Main$drawStack, machine, layout_, stackWidthPct * width)
+					A3($author$project$Main$drawStack, machine, layout_, stackWidth)
 				]));
 	});
 var $mdgriffith$elm_ui$Element$html = $mdgriffith$elm_ui$Internal$Model$unstyled;
@@ -30565,8 +30656,8 @@ var $author$project$Main$viewProgram = F2(
 									_Debug_todo(
 										'Main',
 										{
-											start: {line: 574, column: 97},
-											end: {line: 574, column: 107}
+											start: {line: 584, column: 97},
+											end: {line: 584, column: 107}
 										}))
 								]),
 							$author$project$Main$viewMachine(machineView))
