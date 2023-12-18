@@ -11807,9 +11807,6 @@ var $author$project$Main$WindowResized = F2(
 var $author$project$Main$CompilationError = function (a) {
 	return {$: 'CompilationError', a: a};
 };
-var $author$project$Main$Running = function (a) {
-	return {$: 'Running', a: a};
-};
 var $arturopala$elm_monocle$Monocle$Lens$Lens = F2(
 	function (get, set) {
 		return {get: get, set: set};
@@ -11825,6 +11822,91 @@ var $author$project$Main$accessProgram = A2(
 				m,
 				{program: p});
 		}));
+var $arturopala$elm_monocle$Monocle$Optional$Optional = F2(
+	function (getOption, set) {
+		return {getOption: getOption, set: set};
+	});
+var $arturopala$elm_monocle$Monocle$Optional$flip = F3(
+	function (f, b, a) {
+		return A2(f, a, b);
+	});
+var $elm$core$Maybe$map = F2(
+	function (f, maybe) {
+		if (maybe.$ === 'Just') {
+			var value = maybe.a;
+			return $elm$core$Maybe$Just(
+				f(value));
+		} else {
+			return $elm$core$Maybe$Nothing;
+		}
+	});
+var $arturopala$elm_monocle$Monocle$Optional$compose = F2(
+	function (outer, inner) {
+		var set = F2(
+			function (c, a) {
+				return A2(
+					$elm$core$Maybe$withDefault,
+					a,
+					A2(
+						$elm$core$Maybe$map,
+						A2(
+							$elm$core$Basics$composeR,
+							inner.set(c),
+							A2($arturopala$elm_monocle$Monocle$Optional$flip, outer.set, a)),
+						outer.getOption(a)));
+			});
+		var getOption = function (a) {
+			var _v0 = outer.getOption(a);
+			if (_v0.$ === 'Just') {
+				var x = _v0.a;
+				return inner.getOption(x);
+			} else {
+				return $elm$core$Maybe$Nothing;
+			}
+		};
+		return A2($arturopala$elm_monocle$Monocle$Optional$Optional, getOption, set);
+	});
+var $arturopala$elm_monocle$Monocle$Optional$fromLens = function (lens) {
+	var getOption = function (a) {
+		return $elm$core$Maybe$Just(
+			lens.get(a));
+	};
+	return A2($arturopala$elm_monocle$Monocle$Optional$Optional, getOption, lens.set);
+};
+var $mgold$elm_nonempty_list$List$Nonempty$Nonempty = F2(
+	function (a, b) {
+		return {$: 'Nonempty', a: a, b: b};
+	});
+var $author$project$Main$Running = function (a) {
+	return {$: 'Running', a: a};
+};
+var $author$project$Main$programToMachineView = A2(
+	$arturopala$elm_monocle$Monocle$Optional$Optional,
+	function (p) {
+		if (p.$ === 'Running') {
+			var _v1 = p.a;
+			var m = _v1.a;
+			return $elm$core$Maybe$Just(m);
+		} else {
+			return $elm$core$Maybe$Nothing;
+		}
+	},
+	F2(
+		function (m, p) {
+			if (p.$ === 'Running') {
+				var _v3 = p.a;
+				var history = _v3.b;
+				return $author$project$Main$Running(
+					A2($mgold$elm_nonempty_list$List$Nonempty$Nonempty, m, history));
+			} else {
+				return $author$project$Main$Running(
+					A2($mgold$elm_nonempty_list$List$Nonempty$Nonempty, m, _List_Nil));
+			}
+		}));
+var $author$project$Main$accessMachineView = A2(
+	$arturopala$elm_monocle$Monocle$Optional$compose,
+	$arturopala$elm_monocle$Monocle$Optional$fromLens($author$project$Main$accessProgram),
+	$author$project$Main$programToMachineView);
 var $author$project$Backend$CannotFindMainFunction = {$: 'CannotFindMainFunction'};
 var $author$project$Backend$MainFunctionCannotHaveFormals = {$: 'MainFunctionCannotHaveFormals'};
 var $elm$core$Result$andThen = F2(
@@ -11840,10 +11922,6 @@ var $elm$core$Result$andThen = F2(
 var $author$project$Backend$ParseFailure = function (a) {
 	return {$: 'ParseFailure', a: a};
 };
-var $mgold$elm_nonempty_list$List$Nonempty$Nonempty = F2(
-	function (a, b) {
-		return {$: 'Nonempty', a: a, b: b};
-	});
 var $author$project$Backend$POP = function (a) {
 	return {$: 'POP', a: a};
 };
@@ -14023,16 +14101,6 @@ var $elm_community$intdict$IntDict$foldl = F3(
 			}
 		}
 	});
-var $elm$core$Maybe$map = F2(
-	function (f, maybe) {
-		if (maybe.$ === 'Just') {
-			var value = maybe.a;
-			return $elm$core$Maybe$Just(
-				f(value));
-		} else {
-			return $elm$core$Maybe$Nothing;
-		}
-	});
 var $elm_community$intdict$IntDict$Inner = function (a) {
 	return {$: 'Inner', a: a};
 };
@@ -14414,26 +14482,17 @@ var $elm_community$graph$Graph$remove = F2(
 			$elm$core$Basics$always($elm$core$Maybe$Nothing),
 			graph);
 	});
-var $author$project$Main$machineViewToRuntimeResult = A2(
+var $author$project$Main$accessGMachine = A2(
 	$arturopala$elm_monocle$Monocle$Lens$Lens,
 	function ($) {
-		return $.runtime;
+		return $.machine;
 	},
 	F2(
-		function (r, m) {
+		function (m, v) {
 			return _Utils_update(
-				m,
-				{runtime: r});
+				v,
+				{machine: m});
 		}));
-var $author$project$Main$runtimeResultToGMachine = A2(
-	$arturopala$elm_monocle$Monocle$Lens$Lens,
-	$elm$core$Tuple$first,
-	F2(
-		function (m, _v0) {
-			var u = _v0.b;
-			return _Utils_Tuple2(m, u);
-		}));
-var $author$project$Main$accessGMachine = A2($arturopala$elm_monocle$Monocle$Lens$compose, $author$project$Main$machineViewToRuntimeResult, $author$project$Main$runtimeResultToGMachine);
 var $elm_community$graph$Graph$edges = function (graph) {
 	var flippedFoldl = F3(
 		function (f, dict, list) {
@@ -16534,16 +16593,17 @@ var $author$project$Main$updateMachineView = function (machineUpdate) {
 			return $elm$core$Basics$identity;
 	}
 };
-var $author$project$Main$initializeMachineView = function (result) {
-	var machine = result.a;
-	var machineUpdate = result.b;
+var $author$project$Main$initializeMachineView = function (_v0) {
+	var machine = _v0.a;
+	var machineUpdate = _v0.b;
 	return A2(
 		$author$project$Main$updateMachineView,
 		machineUpdate,
 		{
 			forceSim: $gampleman$elm_visualization$Force$simulation(_List_Nil),
+			lastUpdate: machineUpdate,
 			layout: $elm_community$graph$Graph$empty,
-			runtime: result
+			machine: machine
 		});
 };
 var $elm_community$result_extra$Result$Extra$unpack = F3(
@@ -16560,14 +16620,11 @@ var $author$project$Main$compileSourceCode = function (sourceCode) {
 	return A3(
 		$elm_community$result_extra$Result$Extra$unpack,
 		A2($elm$core$Basics$composeR, $author$project$Main$CompilationError, $author$project$Main$accessProgram.set),
-		A2(
-			$elm$core$Basics$composeR,
-			$author$project$Main$initializeMachineView,
-			A2($elm$core$Basics$composeR, $author$project$Main$Running, $author$project$Main$accessProgram.set)),
+		A2($elm$core$Basics$composeR, $author$project$Main$initializeMachineView, $author$project$Main$accessMachineView.set),
 		$author$project$GMachine$createMachine(sourceCode));
 };
 var $elm$browser$Browser$Dom$getViewport = _Browser_withWindow(_Browser_getViewport);
-var $author$project$Main$initialProgram = '\ntwice f x = f (f x)\ndouble x = x * 2\n\nmain = if (twice double 2 == 8) 1 0\n';
+var $author$project$Main$initialProgram = '\nmain = 1 + 2\n';
 var $elm$core$Basics$round = _Basics_round;
 var $author$project$Main$init = _Utils_Tuple2(
 	A2(
@@ -22169,65 +22226,6 @@ var $mdgriffith$elm_ui$Element$layoutWith = F3(
 var $mdgriffith$elm_ui$Element$layout = $mdgriffith$elm_ui$Element$layoutWith(
 	{options: _List_Nil});
 var $author$project$Main$AnimationFrame = {$: 'AnimationFrame'};
-var $arturopala$elm_monocle$Monocle$Optional$Optional = F2(
-	function (getOption, set) {
-		return {getOption: getOption, set: set};
-	});
-var $arturopala$elm_monocle$Monocle$Optional$flip = F3(
-	function (f, b, a) {
-		return A2(f, a, b);
-	});
-var $arturopala$elm_monocle$Monocle$Optional$compose = F2(
-	function (outer, inner) {
-		var set = F2(
-			function (c, a) {
-				return A2(
-					$elm$core$Maybe$withDefault,
-					a,
-					A2(
-						$elm$core$Maybe$map,
-						A2(
-							$elm$core$Basics$composeR,
-							inner.set(c),
-							A2($arturopala$elm_monocle$Monocle$Optional$flip, outer.set, a)),
-						outer.getOption(a)));
-			});
-		var getOption = function (a) {
-			var _v0 = outer.getOption(a);
-			if (_v0.$ === 'Just') {
-				var x = _v0.a;
-				return inner.getOption(x);
-			} else {
-				return $elm$core$Maybe$Nothing;
-			}
-		};
-		return A2($arturopala$elm_monocle$Monocle$Optional$Optional, getOption, set);
-	});
-var $arturopala$elm_monocle$Monocle$Optional$fromLens = function (lens) {
-	var getOption = function (a) {
-		return $elm$core$Maybe$Just(
-			lens.get(a));
-	};
-	return A2($arturopala$elm_monocle$Monocle$Optional$Optional, getOption, lens.set);
-};
-var $author$project$Main$programToMachineView = A2(
-	$arturopala$elm_monocle$Monocle$Optional$Optional,
-	function (p) {
-		if (p.$ === 'Running') {
-			var m = p.a;
-			return $elm$core$Maybe$Just(m);
-		} else {
-			return $elm$core$Maybe$Nothing;
-		}
-	},
-	F2(
-		function (m, _v1) {
-			return $author$project$Main$Running(m);
-		}));
-var $author$project$Main$accessMachineView = A2(
-	$arturopala$elm_monocle$Monocle$Optional$compose,
-	$arturopala$elm_monocle$Monocle$Optional$fromLens($author$project$Main$accessProgram),
-	$author$project$Main$programToMachineView);
 var $elm$core$Platform$Sub$batch = _Platform_batch;
 var $gampleman$elm_visualization$Force$isCompleted = function (_v0) {
 	var alpha = _v0.a.alpha;
@@ -22594,6 +22592,56 @@ var $arturopala$elm_monocle$Monocle$Optional$modify = F2(
 				A3($arturopala$elm_monocle$Monocle$Optional$modifyOption, opt, fx, a));
 		};
 		return mf;
+	});
+var $author$project$Main$programHistory = A2(
+	$arturopala$elm_monocle$Monocle$Optional$Optional,
+	function (p) {
+		if (p.$ === 'Running') {
+			var history = p.a;
+			return $elm$core$Maybe$Just(history);
+		} else {
+			return $elm$core$Maybe$Nothing;
+		}
+	},
+	F2(
+		function (newHistory, _v1) {
+			return $author$project$Main$Running(newHistory);
+		}));
+var $author$project$Main$accessHistory = A2(
+	$arturopala$elm_monocle$Monocle$Optional$compose,
+	$arturopala$elm_monocle$Monocle$Optional$fromLens($author$project$Main$accessProgram),
+	$author$project$Main$programHistory);
+var $mgold$elm_nonempty_list$List$Nonempty$pop = function (_v0) {
+	var x = _v0.a;
+	var xs = _v0.b;
+	if (!xs.b) {
+		return A2($mgold$elm_nonempty_list$List$Nonempty$Nonempty, x, xs);
+	} else {
+		var y = xs.a;
+		var ys = xs.b;
+		return A2($mgold$elm_nonempty_list$List$Nonempty$Nonempty, y, ys);
+	}
+};
+var $author$project$Main$stepBackMachineView = A2($arturopala$elm_monocle$Monocle$Optional$modify, $author$project$Main$accessHistory, $mgold$elm_nonempty_list$List$Nonempty$pop);
+var $author$project$Main$accessLastUpdate = A2(
+	$arturopala$elm_monocle$Monocle$Lens$Lens,
+	function ($) {
+		return $.lastUpdate;
+	},
+	F2(
+		function (u, v) {
+			return _Utils_update(
+				v,
+				{lastUpdate: u});
+		}));
+var $mgold$elm_nonempty_list$List$Nonempty$cons = F2(
+	function (y, _v0) {
+		var x = _v0.a;
+		var xs = _v0.b;
+		return A2(
+			$mgold$elm_nonempty_list$List$Nonempty$Nonempty,
+			y,
+			A2($elm$core$List$cons, x, xs));
 	});
 var $author$project$GMachine$isTermination = function (update) {
 	isTermination:
@@ -23481,17 +23529,40 @@ var $author$project$GMachine$step = function (machine) {
 	}
 };
 var $author$project$Main$stepMachineView = function (mview) {
-	var machineUpdate = mview.runtime.b;
-	if ($author$project$GMachine$isTermination(machineUpdate)) {
-		return mview;
-	} else {
-		var result = $author$project$GMachine$step(
-			$author$project$Main$accessGMachine.get(mview));
-		return A2(
-			$author$project$Main$updateMachineView,
-			result.b,
-			A2($author$project$Main$machineViewToRuntimeResult.set, result, mview));
-	}
+	var _v0 = $author$project$GMachine$step(
+		$author$project$Main$accessGMachine.get(mview));
+	var newMachine = _v0.a;
+	var machineUpdate = _v0.b;
+	return A2(
+		$author$project$Main$updateMachineView,
+		machineUpdate,
+		A2(
+			$author$project$Main$accessGMachine.set,
+			newMachine,
+			A2($author$project$Main$accessLastUpdate.set, machineUpdate, mview)));
+};
+var $author$project$Main$stepForwardMachineView = function (model) {
+	var cannotMoveForward = A2(
+		$elm$core$Maybe$withDefault,
+		true,
+		A2(
+			$elm$core$Maybe$map,
+			$author$project$GMachine$isTermination,
+			A2(
+				$elm$core$Maybe$map,
+				$author$project$Main$accessLastUpdate.get,
+				$author$project$Main$accessMachineView.getOption(model))));
+	return A3(
+		$arturopala$elm_monocle$Monocle$Optional$modify,
+		$author$project$Main$accessHistory,
+		function (history) {
+			var currentState = $mgold$elm_nonempty_list$List$Nonempty$head(history);
+			return cannotMoveForward ? history : A2(
+				$mgold$elm_nonempty_list$List$Nonempty$cons,
+				$author$project$Main$stepMachineView(currentState),
+				history);
+		},
+		model);
 };
 var $elm_community$intdict$IntDict$values = function (dict) {
 	return A3(
@@ -24880,9 +24951,13 @@ var $author$project$Main$update = F2(
 						model,
 						{sourceCode: src}),
 					$elm$core$Platform$Cmd$none);
-			case 'ClickedStep':
+			case 'ClickedStepForward':
 				return _Utils_Tuple2(
-					A3($arturopala$elm_monocle$Monocle$Optional$modify, $author$project$Main$accessMachineView, $author$project$Main$stepMachineView, model),
+					$author$project$Main$stepForwardMachineView(model),
+					$elm$core$Platform$Cmd$none);
+			case 'ClickedStepBack':
+				return _Utils_Tuple2(
+					$author$project$Main$stepBackMachineView(model),
 					$elm$core$Platform$Cmd$none);
 			case 'WindowResized':
 				var w = msg.a;
@@ -26346,13 +26421,194 @@ var $author$project$Main$sourceCodeTextArea = function (src) {
 				text: src
 			}));
 };
-var $author$project$Main$ClickedStep = {$: 'ClickedStep'};
-var $author$project$Main$stepButton = A2(
+var $author$project$Main$ClickedStepBack = {$: 'ClickedStepBack'};
+var $elm$svg$Svg$Attributes$class = _VirtualDom_attribute('class');
+var $elm$svg$Svg$Attributes$fill = _VirtualDom_attribute('fill');
+var $elm$svg$Svg$Attributes$height = _VirtualDom_attribute('height');
+var $elm$svg$Svg$trustedNode = _VirtualDom_nodeNS('http://www.w3.org/2000/svg');
+var $elm$svg$Svg$line = $elm$svg$Svg$trustedNode('line');
+var $1602$elm_feather$FeatherIcons$Icon = function (a) {
+	return {$: 'Icon', a: a};
+};
+var $1602$elm_feather$FeatherIcons$defaultAttributes = function (name) {
+	return {
+		_class: $elm$core$Maybe$Just('feather feather-' + name),
+		size: 24,
+		sizeUnit: '',
+		strokeWidth: 2,
+		viewBox: '0 0 24 24'
+	};
+};
+var $1602$elm_feather$FeatherIcons$makeBuilder = F2(
+	function (name, src) {
+		return $1602$elm_feather$FeatherIcons$Icon(
+			{
+				attrs: $1602$elm_feather$FeatherIcons$defaultAttributes(name),
+				src: src
+			});
+	});
+var $elm$svg$Svg$Attributes$points = _VirtualDom_attribute('points');
+var $elm$svg$Svg$polyline = $elm$svg$Svg$trustedNode('polyline');
+var $elm$svg$Svg$Attributes$stroke = _VirtualDom_attribute('stroke');
+var $elm$svg$Svg$Attributes$strokeLinecap = _VirtualDom_attribute('stroke-linecap');
+var $elm$svg$Svg$Attributes$strokeLinejoin = _VirtualDom_attribute('stroke-linejoin');
+var $elm$svg$Svg$Attributes$strokeWidth = _VirtualDom_attribute('stroke-width');
+var $elm$svg$Svg$svg = $elm$svg$Svg$trustedNode('svg');
+var $elm$svg$Svg$Attributes$viewBox = _VirtualDom_attribute('viewBox');
+var $elm$svg$Svg$Attributes$width = _VirtualDom_attribute('width');
+var $elm$svg$Svg$Attributes$x1 = _VirtualDom_attribute('x1');
+var $elm$svg$Svg$Attributes$x2 = _VirtualDom_attribute('x2');
+var $1602$elm_feather$FeatherIcons$xmlns = function (s) {
+	return A2(
+		$elm$virtual_dom$VirtualDom$property,
+		'xmlns',
+		$elm$json$Json$Encode$string(s));
+};
+var $elm$svg$Svg$Attributes$y1 = _VirtualDom_attribute('y1');
+var $elm$svg$Svg$Attributes$y2 = _VirtualDom_attribute('y2');
+var $1602$elm_feather$FeatherIcons$arrowLeft = A2(
+	$1602$elm_feather$FeatherIcons$makeBuilder,
+	'arrow-left',
+	_List_fromArray(
+		[
+			A2(
+			$elm$svg$Svg$svg,
+			_List_fromArray(
+				[
+					$1602$elm_feather$FeatherIcons$xmlns('http://www.w3.org/2000/svg'),
+					$elm$svg$Svg$Attributes$width('24'),
+					$elm$svg$Svg$Attributes$height('24'),
+					$elm$svg$Svg$Attributes$viewBox('0 0 24 24'),
+					$elm$svg$Svg$Attributes$fill('none'),
+					$elm$svg$Svg$Attributes$stroke('currentColor'),
+					$elm$svg$Svg$Attributes$strokeWidth('2'),
+					$elm$svg$Svg$Attributes$strokeLinecap('round'),
+					$elm$svg$Svg$Attributes$strokeLinejoin('round'),
+					$elm$svg$Svg$Attributes$class('feather feather-arrow-left')
+				]),
+			_List_fromArray(
+				[
+					A2(
+					$elm$svg$Svg$line,
+					_List_fromArray(
+						[
+							$elm$svg$Svg$Attributes$x1('19'),
+							$elm$svg$Svg$Attributes$y1('12'),
+							$elm$svg$Svg$Attributes$x2('5'),
+							$elm$svg$Svg$Attributes$y2('12')
+						]),
+					_List_Nil),
+					A2(
+					$elm$svg$Svg$polyline,
+					_List_fromArray(
+						[
+							$elm$svg$Svg$Attributes$points('12 19 5 12 12 5')
+						]),
+					_List_Nil)
+				]))
+		]));
+var $mdgriffith$elm_ui$Element$html = $mdgriffith$elm_ui$Internal$Model$unstyled;
+var $elm$svg$Svg$map = $elm$virtual_dom$VirtualDom$map;
+var $1602$elm_feather$FeatherIcons$toHtml = F2(
+	function (attributes, _v0) {
+		var src = _v0.a.src;
+		var attrs = _v0.a.attrs;
+		var strSize = $elm$core$String$fromFloat(attrs.size);
+		var baseAttributes = _List_fromArray(
+			[
+				$elm$svg$Svg$Attributes$fill('none'),
+				$elm$svg$Svg$Attributes$height(
+				_Utils_ap(strSize, attrs.sizeUnit)),
+				$elm$svg$Svg$Attributes$width(
+				_Utils_ap(strSize, attrs.sizeUnit)),
+				$elm$svg$Svg$Attributes$stroke('currentColor'),
+				$elm$svg$Svg$Attributes$strokeLinecap('round'),
+				$elm$svg$Svg$Attributes$strokeLinejoin('round'),
+				$elm$svg$Svg$Attributes$strokeWidth(
+				$elm$core$String$fromFloat(attrs.strokeWidth)),
+				$elm$svg$Svg$Attributes$viewBox(attrs.viewBox)
+			]);
+		var combinedAttributes = _Utils_ap(
+			function () {
+				var _v1 = attrs._class;
+				if (_v1.$ === 'Just') {
+					var c = _v1.a;
+					return A2(
+						$elm$core$List$cons,
+						$elm$svg$Svg$Attributes$class(c),
+						baseAttributes);
+				} else {
+					return baseAttributes;
+				}
+			}(),
+			attributes);
+		return A2(
+			$elm$svg$Svg$svg,
+			combinedAttributes,
+			A2(
+				$elm$core$List$map,
+				$elm$svg$Svg$map($elm$core$Basics$never),
+				src));
+	});
+var $author$project$Main$icon = A2(
+	$elm$core$Basics$composeR,
+	$1602$elm_feather$FeatherIcons$toHtml(_List_Nil),
+	$mdgriffith$elm_ui$Element$html);
+var $author$project$Main$stepBackButton = A2(
 	$mdgriffith$elm_ui$Element$Input$button,
 	$author$project$Main$buttonStyle,
 	{
-		label: $mdgriffith$elm_ui$Element$text('step'),
-		onPress: $elm$core$Maybe$Just($author$project$Main$ClickedStep)
+		label: $author$project$Main$icon($1602$elm_feather$FeatherIcons$arrowLeft),
+		onPress: $elm$core$Maybe$Just($author$project$Main$ClickedStepBack)
+	});
+var $author$project$Main$ClickedStepForward = {$: 'ClickedStepForward'};
+var $1602$elm_feather$FeatherIcons$arrowRight = A2(
+	$1602$elm_feather$FeatherIcons$makeBuilder,
+	'arrow-right',
+	_List_fromArray(
+		[
+			A2(
+			$elm$svg$Svg$svg,
+			_List_fromArray(
+				[
+					$1602$elm_feather$FeatherIcons$xmlns('http://www.w3.org/2000/svg'),
+					$elm$svg$Svg$Attributes$width('24'),
+					$elm$svg$Svg$Attributes$height('24'),
+					$elm$svg$Svg$Attributes$viewBox('0 0 24 24'),
+					$elm$svg$Svg$Attributes$fill('none'),
+					$elm$svg$Svg$Attributes$stroke('currentColor'),
+					$elm$svg$Svg$Attributes$strokeWidth('2'),
+					$elm$svg$Svg$Attributes$strokeLinecap('round'),
+					$elm$svg$Svg$Attributes$strokeLinejoin('round'),
+					$elm$svg$Svg$Attributes$class('feather feather-arrow-right')
+				]),
+			_List_fromArray(
+				[
+					A2(
+					$elm$svg$Svg$line,
+					_List_fromArray(
+						[
+							$elm$svg$Svg$Attributes$x1('5'),
+							$elm$svg$Svg$Attributes$y1('12'),
+							$elm$svg$Svg$Attributes$x2('19'),
+							$elm$svg$Svg$Attributes$y2('12')
+						]),
+					_List_Nil),
+					A2(
+					$elm$svg$Svg$polyline,
+					_List_fromArray(
+						[
+							$elm$svg$Svg$Attributes$points('12 5 19 12 12 19')
+						]),
+					_List_Nil)
+				]))
+		]));
+var $author$project$Main$stepForwardButton = A2(
+	$mdgriffith$elm_ui$Element$Input$button,
+	$author$project$Main$buttonStyle,
+	{
+		label: $author$project$Main$icon($1602$elm_feather$FeatherIcons$arrowRight),
+		onPress: $elm$core$Maybe$Just($author$project$Main$ClickedStepForward)
 	});
 var $mdgriffith$elm_ui$Element$explain = function (_v0) {
 	return $mdgriffith$elm_ui$Internal$Model$htmlClass('explain');
@@ -30567,7 +30823,7 @@ var $author$project$Main$scaleLayout = F2(
 		};
 		return $elm_community$graph$Graph$mapNodes(scale);
 	});
-var $author$project$Main$fitLayout = F3(
+var $author$project$Main$shrinkToFit = F3(
 	function (w, h, layout) {
 		var _v0 = $author$project$Main$layoutDimensions(layout);
 		var width = _v0.width;
@@ -30597,7 +30853,7 @@ var $author$project$Main$drawMachine = F2(
 			$author$project$Main$translateLayout,
 			stackWidth + (graphWidth / 2),
 			height / 2,
-			A3($author$project$Main$fitLayout, graphWidth, height, layout));
+			A3($author$project$Main$shrinkToFit, graphWidth, height, layout));
 		return A2(
 			$elm_community$typed_svg$TypedSvg$svg,
 			_List_fromArray(
@@ -30613,13 +30869,9 @@ var $author$project$Main$drawMachine = F2(
 					A3($author$project$Main$drawStack, machine, layout_, stackWidth)
 				]));
 	});
-var $mdgriffith$elm_ui$Element$html = $mdgriffith$elm_ui$Internal$Model$unstyled;
 var $author$project$Main$viewMachine = function (_v0) {
-	var runtime = _v0.runtime;
+	var machine = _v0.machine;
 	var layout = _v0.layout;
-	var _v1 = runtime;
-	var machine = _v1.a;
-	var machineUpdate = _v1.b;
 	return $mdgriffith$elm_ui$Element$html(
 		A2($author$project$Main$drawMachine, machine, layout));
 };
@@ -30627,7 +30879,8 @@ var $author$project$Main$viewProgram = F2(
 	function (viewport, program) {
 		switch (program.$) {
 			case 'Running':
-				var machineView = program.a;
+				var _v1 = program.a;
+				var machineView = _v1.a;
 				var code = A2($elm$core$Basics$composeR, $author$project$Main$accessGMachine.get, $author$project$GMachine$getCodePtr)(machineView);
 				return A2(
 					$mdgriffith$elm_ui$Element$row,
@@ -30656,8 +30909,8 @@ var $author$project$Main$viewProgram = F2(
 									_Debug_todo(
 										'Main',
 										{
-											start: {line: 584, column: 97},
-											end: {line: 584, column: 107}
+											start: {line: 631, column: 97},
+											end: {line: 631, column: 107}
 										}))
 								]),
 							$author$project$Main$viewMachine(machineView))
@@ -30700,7 +30953,7 @@ var $author$project$Main$view = function (_v0) {
 						$mdgriffith$elm_ui$Element$row,
 						_List_Nil,
 						_List_fromArray(
-							[$author$project$Main$compileButton, $author$project$Main$stepButton]))
+							[$author$project$Main$compileButton, $author$project$Main$stepBackButton, $author$project$Main$stepForwardButton]))
 					])),
 				A2(
 				$mdgriffith$elm_ui$Element$el,
@@ -30726,4 +30979,4 @@ var $author$project$Main$main = $elm$browser$Browser$element(
 			$author$project$Main$view)
 	});
 _Platform_export({'Main':{'init':$author$project$Main$main(
-	$elm$json$Json$Decode$succeed(_Utils_Tuple0))({"versions":{"elm":"0.19.1"},"types":{"message":"Main.Msg","aliases":{},"unions":{"Main.Msg":{"args":[],"tags":{"ClickedCompile":[],"ChangedSourceCode":["String.String"],"ClickedStep":[],"WindowResized":["Basics.Int","Basics.Int"],"AnimationFrame":[]}},"Basics.Int":{"args":[],"tags":{"Int":[]}},"String.String":{"args":[],"tags":{"String":[]}}}}})}});}(this));
+	$elm$json$Json$Decode$succeed(_Utils_Tuple0))({"versions":{"elm":"0.19.1"},"types":{"message":"Main.Msg","aliases":{},"unions":{"Main.Msg":{"args":[],"tags":{"ClickedCompile":[],"ChangedSourceCode":["String.String"],"ClickedStepForward":[],"ClickedStepBack":[],"WindowResized":["Basics.Int","Basics.Int"],"AnimationFrame":[]}},"Basics.Int":{"args":[],"tags":{"Int":[]}},"String.String":{"args":[],"tags":{"String":[]}}}}})}});}(this));

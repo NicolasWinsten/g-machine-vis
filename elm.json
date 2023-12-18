@@ -6,6 +6,7 @@
     "elm-version": "0.19.1",
     "dependencies": {
         "direct": {
+            "1602/elm-feather": "2.3.5",
             "Punie/elm-parser-extras": "1.0.0",
             "arturopala/elm-monocle": "2.2.0",
             "avh4/elm-color": "1.0.0",

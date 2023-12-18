@@ -16,6 +16,7 @@ import TypedSvg.Core exposing (Svg)
 import TypedSvg as Svg
 import TypedSvg.Attributes as SvgA
 import TypedSvg.Types as SvgT
+import FeatherIcons as Icons
 import Result.Extra
 import Basics.Extra exposing (flip, atMost, atLeast)
 import Backend
@@ -36,6 +37,7 @@ import Graph
 import Hierarchy
 import Tree
 import Math.Vector2 as Vec
+import List.Nonempty as Nonempty exposing (Nonempty, Nonempty(..))
 
 {-| each node in the graph's heap will be given an entity in a force simulation
 to track position and velocity
@@ -69,14 +71,19 @@ accessEntity = Lens.compose accessNode nodeToEntity
 accessPos : Lens NodeContext (Float, Float)
 accessPos = Lens.compose accessEntity entityPos
 
+type alias MachineHistory = Nonempty MachineView
 
 type alias MachineView =
-  { runtime : G.RuntimeResult -- TODO provide separate fields for machine and last update
+  { machine : G.GMachine
+  , lastUpdate : G.MachineUpdate
   , layout : GraphLayout
   , forceSim : Force.State G.HeapAddr
   }
 
-type ProgramView = Uninitialized | Running MachineView | CompilationError Backend.CompilerError
+type ProgramView
+  = Uninitialized
+  | Running MachineHistory
+  | CompilationError Backend.CompilerError
 
 type alias ViewPort = {width : Int, height : Int}
 
@@ -89,35 +96,48 @@ type alias Model =
 type Msg
   = ClickedCompile
   | ChangedSourceCode String
-  | ClickedStep
+  | ClickedStepForward
+  | ClickedStepBack
   | WindowResized Int Int
   | AnimationFrame
 
-runtimeResultToGMachine : Lens G.RuntimeResult G.GMachine
-runtimeResultToGMachine = Lens Tuple.first (\m (_, u) -> (m,u))
 
-machineViewToRuntimeResult : Lens MachineView G.RuntimeResult
-machineViewToRuntimeResult = Lens .runtime (\r m -> {m | runtime=r})
+accessGMachine : Lens MachineView G.GMachine
+accessGMachine = Lens .machine (\m v -> {v | machine=m})
+
+accessLastUpdate : Lens MachineView G.MachineUpdate
+accessLastUpdate = Lens .lastUpdate (\u v -> {v | lastUpdate=u})
 
 accessLayout : Lens MachineView GraphLayout
 accessLayout = Lens .layout (\l m -> {m | layout=l})
 
+programHistory : Optional ProgramView MachineHistory
+programHistory = Optional
+  (\p -> case p of
+    Running history -> Just history
+    _ -> Nothing
+  )
+  (\newHistory _ -> Running newHistory)
+
 accessProgram : Lens Model ProgramView
 accessProgram = Lens .program (\p m -> {m | program=p})
+
+accessHistory : Optional Model MachineHistory
+accessHistory = Optional.compose (Optional.fromLens accessProgram) programHistory
 
 programToMachineView : Optional ProgramView MachineView
 programToMachineView = Optional
   (\p -> case p of
-    Running m -> Just m
+    Running (Nonempty m _) -> Just m
     _ -> Nothing
   )
-  (\m _ -> Running m)
+  (\m p -> case p of
+    Running (Nonempty _ history) -> Running (Nonempty m history)
+    _ -> Running (Nonempty m []) 
+  )
 
 accessMachineView : Optional Model MachineView
 accessMachineView = Optional.compose (Optional.fromLens accessProgram) programToMachineView
-
-accessGMachine : Lens MachineView G.GMachine
-accessGMachine = Lens.compose machineViewToRuntimeResult runtimeResultToGMachine
 
 when : Bool -> (a -> a) -> a -> a
 when cond f x = if cond then f x else x
@@ -274,35 +294,53 @@ updateMachineView machineUpdate = case machineUpdate of
   G.NoUpdate -> identity
 
 initializeMachineView : G.RuntimeResult -> MachineView
-initializeMachineView ((machine, machineUpdate) as result) =
+initializeMachineView (machine, machineUpdate) =
   updateMachineView machineUpdate
-  { runtime=result, layout=Graph.empty, forceSim=Force.simulation []}
+  { machine=machine, lastUpdate=machineUpdate, layout=Graph.empty, forceSim=Force.simulation []}
 
-{-| perform the next state transition and update the machine's view
+{-| return the new machine view after a state transition
 -}
 stepMachineView : MachineView -> MachineView
 stepMachineView mview =
-  let machineUpdate = Tuple.second mview.runtime in
-  if G.isTermination machineUpdate
-  then mview
-  else let result = G.step (accessGMachine.get mview)
+  let (newMachine, machineUpdate) = G.step (accessGMachine.get mview)
   in mview
-  |> machineViewToRuntimeResult.set result
-  |> updateMachineView (Tuple.second result)
+  |> accessLastUpdate.set machineUpdate
+  |> accessGMachine.set newMachine
+  |> updateMachineView machineUpdate
+
+{-| if the machine hasn't terminated,
+perform a state transition and add the new machine state to the program history 
+-}
+stepForwardMachineView : Model -> Model
+stepForwardMachineView model =
+  let cannotMoveForward = model
+        |> accessMachineView.getOption
+        |> Maybe.map accessLastUpdate.get
+        |> Maybe.map G.isTermination
+        |> Maybe.withDefault True
+  in Optional.modify accessHistory
+  (\history ->
+    let currentState = Nonempty.head history
+    in if cannotMoveForward then history
+    else Nonempty.cons (stepMachineView currentState) history 
+  )
+  model
+
+{-| return to previous Gmachine state
+-}
+stepBackMachineView : Model -> Model
+stepBackMachineView = Optional.modify accessHistory Nonempty.pop
 
 
 initialProgram =
   """
-twice f x = f (f x)
-double x = x * 2
-
-main = if (twice double 2 == 8) 1 0
+main = 1 + 2
 """
 
 compileSourceCode : String -> Model -> Model
 compileSourceCode sourceCode = Result.Extra.unpack
     (CompilationError >> accessProgram.set)
-    (initializeMachineView >> Running >> accessProgram.set)
+    (initializeMachineView >> accessMachineView.set)
     (G.createMachine sourceCode)
 
 init =
@@ -319,7 +357,9 @@ update msg model = case msg of
 
   ChangedSourceCode src -> ({model | sourceCode=src}, Cmd.none)
 
-  ClickedStep -> (Optional.modify accessMachineView stepMachineView model, Cmd.none)
+  ClickedStepForward -> (stepForwardMachineView model, Cmd.none)
+
+  ClickedStepBack -> (stepBackMachineView model, Cmd.none)
   
   WindowResized w h -> ({ model | viewport={width=w, height=h}}, Cmd.none)
 
@@ -346,14 +386,22 @@ buttonStyle =
   , E.mouseDown [E.scale 1.1]
   ]
 
+icon : Icons.Icon -> E.Element msg
+icon = Icons.toHtml [] >> E.html
+
 compileButton = EI.button buttonStyle
   { onPress = Just ClickedCompile
   , label = E.text "compile"
   }
 
-stepButton = EI.button buttonStyle
-  { onPress = Just ClickedStep
-  , label = E.text "step"
+stepForwardButton = EI.button buttonStyle
+  { onPress = Just ClickedStepForward
+  , label = icon Icons.arrowRight
+  }
+
+stepBackButton = EI.button buttonStyle
+  { onPress = Just ClickedStepBack
+  , label = icon Icons.arrowLeft
   }
 
 fillWidth = E.width E.fill
@@ -483,8 +531,8 @@ layoutDimensions layout =
   in {width=maxX - minX + nodeSize, height=maxY - minY + nodeSize}
 
 {-| scale the layout to fit the new dimensions, assuming the layout is centered at (0,0) -}
-fitLayout : Float -> Float -> GraphLayout -> GraphLayout
-fitLayout w h layout =
+shrinkToFit : Float -> Float -> GraphLayout -> GraphLayout
+shrinkToFit w h layout =
   let {width, height} = layoutDimensions layout
       scaleX = w / width |> atMost 1
       scaleY = h / height |> atMost 1
@@ -509,7 +557,7 @@ drawMachine machine layout =
     stackWidth = width * stackWidthPct
     graphWidth = width - stackWidth
     layout_ = layout
-        |> fitLayout graphWidth height
+        |> shrinkToFit graphWidth height
         |> translateLayout (stackWidth + graphWidth/2) (height/2)
 
   in Svg.svg
@@ -571,13 +619,12 @@ drawStack machine layout cellWidth =
 
 
 viewMachine : MachineView -> E.Element msg
-viewMachine {runtime, layout} =
-  let (machine, machineUpdate) = runtime
-  in E.html (drawMachine machine layout)
+viewMachine {machine, layout} =
+  E.html (drawMachine machine layout)
 
 viewProgram : ViewPort -> ProgramView -> E.Element msg
 viewProgram viewport program = case program of
-  Running machineView ->
+  Running (Nonempty machineView _) ->
     let code = (accessGMachine.get >> G.getCodePtr) machineView
     in E.row [fillHeight, fillWidth]
       [ E.el [fillHeight, E.width (E.fillPortion 2)] (viewCode code)
@@ -599,7 +646,7 @@ view {sourceCode, program, viewport} =
     E.row [fillWidth, fillHeight, Font.family [Font.monospace]]
     [ E.column [E.width (E.fillPortion 2), fillHeight]
         [ sourceCodeTextArea sourceCode
-        , E.row [] [compileButton, stepButton]
+        , E.row [] [compileButton, stepBackButton, stepForwardButton]
         ]
     , E.el [E.width (E.fillPortion 5), fillHeight]
       (viewProgram viewport program) 
