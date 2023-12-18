@@ -169,10 +169,10 @@ takeTree root seen graph =
 
 also return the edges participating in the tree
 -}
-hierarchicalLayout : G.GMachine -> GraphLayout
+hierarchicalLayout : GraphLayout
   -> {placements : Dict G.HeapAddr (Float, Float), edges : List (G.HeapAddr, G.HeapAddr)}
-hierarchicalLayout machine layout =
-  let tree = Maybe.andThen (\root -> takeTree root Set.empty layout) (G.getCurrentRedexRoot machine)
+hierarchicalLayout layout =
+  let tree = takeTree G.mainRedexRoot Set.empty layout
       edges = Maybe.withDefault [] (Maybe.map Tree.links tree)
       applyLayout = Hierarchy.tidy
         [ Hierarchy.nodeSize (always (nodeSize, nodeSize))
@@ -187,7 +187,7 @@ hierarchicalLayout machine layout =
 
 resetForceSim : MachineView -> MachineView
 resetForceSim mview =
-  let hierarchy = hierarchicalLayout (accessGMachine.get mview) mview.layout
+  let hierarchy = hierarchicalLayout mview.layout
       
       -- center the hierarchical layout around (0,0)
       (sumX, sumY) = Dict.foldl
@@ -293,10 +293,15 @@ updateMachineView machineUpdate = case machineUpdate of
 
   G.NoUpdate -> identity
 
-initializeMachineView : G.RuntimeResult -> MachineView
-initializeMachineView (machine, machineUpdate) =
-  updateMachineView machineUpdate
-  { machine=machine, lastUpdate=machineUpdate, layout=Graph.empty, forceSim=Force.simulation []}
+initializeProgram : G.RuntimeResult -> ProgramView
+initializeProgram (machine, machineUpdate) =
+  let machineView = updateMachineView machineUpdate
+        { machine=machine
+        , lastUpdate=machineUpdate
+        , layout=Graph.empty
+        , forceSim=Force.simulation []
+        }
+  in Running (Nonempty.singleton machineView)
 
 {-| return the new machine view after a state transition
 -}
@@ -334,13 +339,15 @@ stepBackMachineView = Optional.modify accessHistory Nonempty.pop
 
 initialProgram =
   """
-main = 1 + 2
+badfac x = if (x == 1) 1 (x * badfac (x-1))
+goodfac x acc = if (x == 1) acc (goodfac (x-1) (x*acc))
+main = goodfac 5  1 == badfac 5
 """
 
 compileSourceCode : String -> Model -> Model
 compileSourceCode sourceCode = Result.Extra.unpack
     (CompilationError >> accessProgram.set)
-    (initializeMachineView >> accessMachineView.set)
+    (initializeProgram >> accessProgram.set)
     (G.createMachine sourceCode)
 
 init =
@@ -628,7 +635,7 @@ viewProgram viewport program = case program of
     let code = (accessGMachine.get >> G.getCodePtr) machineView
     in E.row [fillHeight, fillWidth]
       [ E.el [fillHeight, E.width (E.fillPortion 2)] (viewCode code)
-      , E.el [E.width (E.fillPortion 5), E.height (E.maximum viewport.height E.fill), E.explain Debug.todo] (viewMachine machineView)
+      , E.el [E.width (E.fillPortion 5), E.height (E.maximum viewport.height E.fill)] (viewMachine machineView)
       ]
   CompilationError err -> E.text "compilation error"
   Uninitialized -> E.text "Write a program on the left window and hit compile"

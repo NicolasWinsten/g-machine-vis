@@ -11822,91 +11822,6 @@ var $author$project$Main$accessProgram = A2(
 				m,
 				{program: p});
 		}));
-var $arturopala$elm_monocle$Monocle$Optional$Optional = F2(
-	function (getOption, set) {
-		return {getOption: getOption, set: set};
-	});
-var $arturopala$elm_monocle$Monocle$Optional$flip = F3(
-	function (f, b, a) {
-		return A2(f, a, b);
-	});
-var $elm$core$Maybe$map = F2(
-	function (f, maybe) {
-		if (maybe.$ === 'Just') {
-			var value = maybe.a;
-			return $elm$core$Maybe$Just(
-				f(value));
-		} else {
-			return $elm$core$Maybe$Nothing;
-		}
-	});
-var $arturopala$elm_monocle$Monocle$Optional$compose = F2(
-	function (outer, inner) {
-		var set = F2(
-			function (c, a) {
-				return A2(
-					$elm$core$Maybe$withDefault,
-					a,
-					A2(
-						$elm$core$Maybe$map,
-						A2(
-							$elm$core$Basics$composeR,
-							inner.set(c),
-							A2($arturopala$elm_monocle$Monocle$Optional$flip, outer.set, a)),
-						outer.getOption(a)));
-			});
-		var getOption = function (a) {
-			var _v0 = outer.getOption(a);
-			if (_v0.$ === 'Just') {
-				var x = _v0.a;
-				return inner.getOption(x);
-			} else {
-				return $elm$core$Maybe$Nothing;
-			}
-		};
-		return A2($arturopala$elm_monocle$Monocle$Optional$Optional, getOption, set);
-	});
-var $arturopala$elm_monocle$Monocle$Optional$fromLens = function (lens) {
-	var getOption = function (a) {
-		return $elm$core$Maybe$Just(
-			lens.get(a));
-	};
-	return A2($arturopala$elm_monocle$Monocle$Optional$Optional, getOption, lens.set);
-};
-var $mgold$elm_nonempty_list$List$Nonempty$Nonempty = F2(
-	function (a, b) {
-		return {$: 'Nonempty', a: a, b: b};
-	});
-var $author$project$Main$Running = function (a) {
-	return {$: 'Running', a: a};
-};
-var $author$project$Main$programToMachineView = A2(
-	$arturopala$elm_monocle$Monocle$Optional$Optional,
-	function (p) {
-		if (p.$ === 'Running') {
-			var _v1 = p.a;
-			var m = _v1.a;
-			return $elm$core$Maybe$Just(m);
-		} else {
-			return $elm$core$Maybe$Nothing;
-		}
-	},
-	F2(
-		function (m, p) {
-			if (p.$ === 'Running') {
-				var _v3 = p.a;
-				var history = _v3.b;
-				return $author$project$Main$Running(
-					A2($mgold$elm_nonempty_list$List$Nonempty$Nonempty, m, history));
-			} else {
-				return $author$project$Main$Running(
-					A2($mgold$elm_nonempty_list$List$Nonempty$Nonempty, m, _List_Nil));
-			}
-		}));
-var $author$project$Main$accessMachineView = A2(
-	$arturopala$elm_monocle$Monocle$Optional$compose,
-	$arturopala$elm_monocle$Monocle$Optional$fromLens($author$project$Main$accessProgram),
-	$author$project$Main$programToMachineView);
 var $author$project$Backend$CannotFindMainFunction = {$: 'CannotFindMainFunction'};
 var $author$project$Backend$MainFunctionCannotHaveFormals = {$: 'MainFunctionCannotHaveFormals'};
 var $elm$core$Result$andThen = F2(
@@ -11922,6 +11837,10 @@ var $elm$core$Result$andThen = F2(
 var $author$project$Backend$ParseFailure = function (a) {
 	return {$: 'ParseFailure', a: a};
 };
+var $mgold$elm_nonempty_list$List$Nonempty$Nonempty = F2(
+	function (a, b) {
+		return {$: 'Nonempty', a: a, b: b};
+	});
 var $author$project$Backend$POP = function (a) {
 	return {$: 'POP', a: a};
 };
@@ -13619,6 +13538,24 @@ var $author$project$GMachine$Multiple = F2(
 	function (a, b) {
 		return {$: 'Multiple', a: a, b: b};
 	});
+var $author$project$GMachine$isTermination = function (update) {
+	isTermination:
+	while (true) {
+		switch (update.$) {
+			case 'Output':
+				return true;
+			case 'Crash':
+				return true;
+			case 'Multiple':
+				var updates = update.b;
+				var $temp$update = updates;
+				update = $temp$update;
+				continue isTermination;
+			default:
+				return false;
+		}
+	}
+};
 var $elm$core$Tuple$mapSecond = F2(
 	function (func, _v0) {
 		var x = _v0.a;
@@ -13631,7 +13568,7 @@ var $author$project$GMachine$andThen = F2(
 	function (procedure, _v0) {
 		var machine = _v0.a;
 		var previousUpdate = _v0.b;
-		return A2(
+		return $author$project$GMachine$isTermination(previousUpdate) ? _Utils_Tuple2(machine, previousUpdate) : A2(
 			$elm$core$Tuple$mapSecond,
 			$author$project$GMachine$Multiple(previousUpdate),
 			procedure(machine));
@@ -14023,6 +13960,9 @@ var $author$project$GMachine$createMachine = function (source) {
 		},
 		$author$project$Backend$compile(source));
 };
+var $author$project$Main$Running = function (a) {
+	return {$: 'Running', a: a};
+};
 var $elm_community$graph$Graph$Graph = function (a) {
 	return {$: 'Graph', a: a};
 };
@@ -14099,6 +14039,16 @@ var $elm_community$intdict$IntDict$foldl = F3(
 					dict = $temp$dict;
 					continue foldl;
 			}
+		}
+	});
+var $elm$core$Maybe$map = F2(
+	function (f, maybe) {
+		if (maybe.$ === 'Just') {
+			var value = maybe.a;
+			return $elm$core$Maybe$Just(
+				f(value));
+		} else {
+			return $elm$core$Maybe$Nothing;
 		}
 	});
 var $elm_community$intdict$IntDict$Inner = function (a) {
@@ -14482,17 +14432,6 @@ var $elm_community$graph$Graph$remove = F2(
 			$elm$core$Basics$always($elm$core$Maybe$Nothing),
 			graph);
 	});
-var $author$project$Main$accessGMachine = A2(
-	$arturopala$elm_monocle$Monocle$Lens$Lens,
-	function ($) {
-		return $.machine;
-	},
-	F2(
-		function (m, v) {
-			return _Utils_update(
-				v,
-				{machine: m});
-		}));
 var $elm_community$graph$Graph$edges = function (graph) {
 	var flippedFoldl = F3(
 		function (f, dict, list) {
@@ -14609,25 +14548,6 @@ var $gampleman$elm_rosetree$Tree$foldl = F3(
 			acc,
 			t);
 	});
-var $elm_community$list_extra$List$Extra$last = function (items) {
-	last:
-	while (true) {
-		if (!items.b) {
-			return $elm$core$Maybe$Nothing;
-		} else {
-			if (!items.b.b) {
-				var x = items.a;
-				return $elm$core$Maybe$Just(x);
-			} else {
-				var rest = items.b;
-				var $temp$items = rest;
-				items = $temp$items;
-				continue last;
-			}
-		}
-	}
-};
-var $author$project$GMachine$getCurrentRedexRoot = A2($elm$core$Basics$composeR, $author$project$GMachine$getStack, $elm_community$list_extra$List$Extra$last);
 var $gampleman$elm_rosetree$Tree$breadthFirstFoldHelp = F5(
 	function (f, acc, parents, trees, nextSets) {
 		breadthFirstFoldHelp:
@@ -14729,6 +14649,7 @@ var $gampleman$elm_rosetree$Tree$links = function (t) {
 			_List_Nil,
 			t));
 };
+var $author$project$GMachine$mainRedexRoot = 0;
 var $gampleman$elm_visualization$Hierarchy$NodeSize = function (a) {
 	return {$: 'NodeSize', a: a};
 };
@@ -16115,47 +16036,41 @@ var $gampleman$elm_visualization$Hierarchy$tidy = F2(
 			return layout;
 		}
 	});
-var $author$project$Main$hierarchicalLayout = F2(
-	function (machine, layout) {
-		var tree = A2(
-			$elm$core$Maybe$andThen,
-			function (root) {
-				return A3($author$project$Main$takeTree, root, $elm$core$Set$empty, layout);
-			},
-			$author$project$GMachine$getCurrentRedexRoot(machine));
-		var edges = A2(
-			$elm$core$Maybe$withDefault,
-			_List_Nil,
-			A2($elm$core$Maybe$map, $gampleman$elm_rosetree$Tree$links, tree));
-		var applyLayout = $gampleman$elm_visualization$Hierarchy$tidy(
-			_List_fromArray(
-				[
-					$gampleman$elm_visualization$Hierarchy$nodeSize(
-					$elm$core$Basics$always(
-						_Utils_Tuple2($author$project$Main$nodeSize, $author$project$Main$nodeSize))),
-					$gampleman$elm_visualization$Hierarchy$parentChildMargin($author$project$Main$nodeSize * 3),
-					$gampleman$elm_visualization$Hierarchy$peerMargin($author$project$Main$nodeSize * 2)
-				]));
-		var placements = A2(
-			$elm$core$Maybe$withDefault,
-			$elm$core$Dict$empty,
+var $author$project$Main$hierarchicalLayout = function (layout) {
+	var tree = A3($author$project$Main$takeTree, $author$project$GMachine$mainRedexRoot, $elm$core$Set$empty, layout);
+	var edges = A2(
+		$elm$core$Maybe$withDefault,
+		_List_Nil,
+		A2($elm$core$Maybe$map, $gampleman$elm_rosetree$Tree$links, tree));
+	var applyLayout = $gampleman$elm_visualization$Hierarchy$tidy(
+		_List_fromArray(
+			[
+				$gampleman$elm_visualization$Hierarchy$nodeSize(
+				$elm$core$Basics$always(
+					_Utils_Tuple2($author$project$Main$nodeSize, $author$project$Main$nodeSize))),
+				$gampleman$elm_visualization$Hierarchy$parentChildMargin($author$project$Main$nodeSize * 3),
+				$gampleman$elm_visualization$Hierarchy$peerMargin($author$project$Main$nodeSize * 2)
+			]));
+	var placements = A2(
+		$elm$core$Maybe$withDefault,
+		$elm$core$Dict$empty,
+		A2(
+			$elm$core$Maybe$map,
 			A2(
-				$elm$core$Maybe$map,
-				A2(
-					$gampleman$elm_rosetree$Tree$foldl,
-					function (_v0) {
-						var node = _v0.node;
-						var x = _v0.x;
-						var y = _v0.y;
-						return A2(
-							$elm$core$Dict$insert,
-							node,
-							_Utils_Tuple2(x, y));
-					},
-					$elm$core$Dict$empty),
-				A2($elm$core$Maybe$map, applyLayout, tree)));
-		return {edges: edges, placements: placements};
-	});
+				$gampleman$elm_rosetree$Tree$foldl,
+				function (_v0) {
+					var node = _v0.node;
+					var x = _v0.x;
+					var y = _v0.y;
+					return A2(
+						$elm$core$Dict$insert,
+						node,
+						_Utils_Tuple2(x, y));
+				},
+				$elm$core$Dict$empty),
+			A2($elm$core$Maybe$map, applyLayout, tree)));
+	return {edges: edges, placements: placements};
+};
 var $gampleman$elm_visualization$Force$Links = F2(
 	function (a, b) {
 		return {$: 'Links', a: a, b: b};
@@ -16303,10 +16218,7 @@ var $gampleman$elm_visualization$Force$towardsY = function (configs) {
 				configs)));
 };
 var $author$project$Main$resetForceSim = function (mview) {
-	var hierarchy = A2(
-		$author$project$Main$hierarchicalLayout,
-		$author$project$Main$accessGMachine.get(mview),
-		mview.layout);
+	var hierarchy = $author$project$Main$hierarchicalLayout(mview.layout);
 	var placedNodes = $elm$core$Dict$size(hierarchy.placements);
 	var gravitateNodes = A2(
 		$elm$core$List$map,
@@ -16593,10 +16505,10 @@ var $author$project$Main$updateMachineView = function (machineUpdate) {
 			return $elm$core$Basics$identity;
 	}
 };
-var $author$project$Main$initializeMachineView = function (_v0) {
+var $author$project$Main$initializeProgram = function (_v0) {
 	var machine = _v0.a;
 	var machineUpdate = _v0.b;
-	return A2(
+	var machineView = A2(
 		$author$project$Main$updateMachineView,
 		machineUpdate,
 		{
@@ -16605,6 +16517,8 @@ var $author$project$Main$initializeMachineView = function (_v0) {
 			layout: $elm_community$graph$Graph$empty,
 			machine: machine
 		});
+	return $author$project$Main$Running(
+		$mgold$elm_nonempty_list$List$Nonempty$singleton(machineView));
 };
 var $elm_community$result_extra$Result$Extra$unpack = F3(
 	function (errFunc, okFunc, result) {
@@ -16620,11 +16534,11 @@ var $author$project$Main$compileSourceCode = function (sourceCode) {
 	return A3(
 		$elm_community$result_extra$Result$Extra$unpack,
 		A2($elm$core$Basics$composeR, $author$project$Main$CompilationError, $author$project$Main$accessProgram.set),
-		A2($elm$core$Basics$composeR, $author$project$Main$initializeMachineView, $author$project$Main$accessMachineView.set),
+		A2($elm$core$Basics$composeR, $author$project$Main$initializeProgram, $author$project$Main$accessProgram.set),
 		$author$project$GMachine$createMachine(sourceCode));
 };
 var $elm$browser$Browser$Dom$getViewport = _Browser_withWindow(_Browser_getViewport);
-var $author$project$Main$initialProgram = '\nmain = 1 + 2\n';
+var $author$project$Main$initialProgram = '\nbadfac x = if (x == 1) 1 (x * badfac (x-1))\ngoodfac x acc = if (x == 1) acc (goodfac (x-1) (x*acc))\nmain = goodfac 5  1 == badfac 5\n';
 var $elm$core$Basics$round = _Basics_round;
 var $author$project$Main$init = _Utils_Tuple2(
 	A2(
@@ -22226,6 +22140,74 @@ var $mdgriffith$elm_ui$Element$layoutWith = F3(
 var $mdgriffith$elm_ui$Element$layout = $mdgriffith$elm_ui$Element$layoutWith(
 	{options: _List_Nil});
 var $author$project$Main$AnimationFrame = {$: 'AnimationFrame'};
+var $arturopala$elm_monocle$Monocle$Optional$Optional = F2(
+	function (getOption, set) {
+		return {getOption: getOption, set: set};
+	});
+var $arturopala$elm_monocle$Monocle$Optional$flip = F3(
+	function (f, b, a) {
+		return A2(f, a, b);
+	});
+var $arturopala$elm_monocle$Monocle$Optional$compose = F2(
+	function (outer, inner) {
+		var set = F2(
+			function (c, a) {
+				return A2(
+					$elm$core$Maybe$withDefault,
+					a,
+					A2(
+						$elm$core$Maybe$map,
+						A2(
+							$elm$core$Basics$composeR,
+							inner.set(c),
+							A2($arturopala$elm_monocle$Monocle$Optional$flip, outer.set, a)),
+						outer.getOption(a)));
+			});
+		var getOption = function (a) {
+			var _v0 = outer.getOption(a);
+			if (_v0.$ === 'Just') {
+				var x = _v0.a;
+				return inner.getOption(x);
+			} else {
+				return $elm$core$Maybe$Nothing;
+			}
+		};
+		return A2($arturopala$elm_monocle$Monocle$Optional$Optional, getOption, set);
+	});
+var $arturopala$elm_monocle$Monocle$Optional$fromLens = function (lens) {
+	var getOption = function (a) {
+		return $elm$core$Maybe$Just(
+			lens.get(a));
+	};
+	return A2($arturopala$elm_monocle$Monocle$Optional$Optional, getOption, lens.set);
+};
+var $author$project$Main$programToMachineView = A2(
+	$arturopala$elm_monocle$Monocle$Optional$Optional,
+	function (p) {
+		if (p.$ === 'Running') {
+			var _v1 = p.a;
+			var m = _v1.a;
+			return $elm$core$Maybe$Just(m);
+		} else {
+			return $elm$core$Maybe$Nothing;
+		}
+	},
+	F2(
+		function (m, p) {
+			if (p.$ === 'Running') {
+				var _v3 = p.a;
+				var history = _v3.b;
+				return $author$project$Main$Running(
+					A2($mgold$elm_nonempty_list$List$Nonempty$Nonempty, m, history));
+			} else {
+				return $author$project$Main$Running(
+					A2($mgold$elm_nonempty_list$List$Nonempty$Nonempty, m, _List_Nil));
+			}
+		}));
+var $author$project$Main$accessMachineView = A2(
+	$arturopala$elm_monocle$Monocle$Optional$compose,
+	$arturopala$elm_monocle$Monocle$Optional$fromLens($author$project$Main$accessProgram),
+	$author$project$Main$programToMachineView);
 var $elm$core$Platform$Sub$batch = _Platform_batch;
 var $gampleman$elm_visualization$Force$isCompleted = function (_v0) {
 	var alpha = _v0.a.alpha;
@@ -22643,24 +22625,17 @@ var $mgold$elm_nonempty_list$List$Nonempty$cons = F2(
 			y,
 			A2($elm$core$List$cons, x, xs));
 	});
-var $author$project$GMachine$isTermination = function (update) {
-	isTermination:
-	while (true) {
-		switch (update.$) {
-			case 'Output':
-				return true;
-			case 'Crash':
-				return true;
-			case 'Multiple':
-				var updates = update.b;
-				var $temp$update = updates;
-				update = $temp$update;
-				continue isTermination;
-			default:
-				return false;
-		}
-	}
-};
+var $author$project$Main$accessGMachine = A2(
+	$arturopala$elm_monocle$Monocle$Lens$Lens,
+	function ($) {
+		return $.machine;
+	},
+	F2(
+		function (m, v) {
+			return _Utils_update(
+				v,
+				{machine: m});
+		}));
 var $staeter$ziplist$ZipList$current = function (_v0) {
 	var elem = _v0.b;
 	return elem;
@@ -23122,29 +23097,37 @@ var $author$project$GMachine$pop = function (num) {
 		$author$project$GMachine$stackLens,
 		$elm$core$List$drop(num));
 };
-var $author$project$GMachine$CannotSaveFrameWhileUnwinding = {$: 'CannotSaveFrameWhileUnwinding'};
 var $author$project$GMachine$saveFrame = function (gmachine) {
 	var _v0 = gmachine.ctx;
 	if (_v0.$ === 'Unwinding') {
-		return $elm$core$Result$Err($author$project$GMachine$CannotSaveFrameWhileUnwinding);
+		return gmachine;
 	} else {
 		var frame = _v0.a;
-		return $elm$core$Result$Ok(
-			_Utils_update(
-				gmachine,
-				{
-					dump: A2($elm$core$List$cons, frame, gmachine.dump)
-				}));
+		return _Utils_update(
+			gmachine,
+			{
+				dump: A2($elm$core$List$cons, frame, gmachine.dump)
+			});
 	}
 };
-var $author$project$GMachine$pushContext = function (gmachine) {
-	return A3(
-		$elm$core$Result$map2,
-		$author$project$GMachine$push,
-		$author$project$GMachine$getTopVal(gmachine),
-		$author$project$GMachine$saveFrame(
-			A2($author$project$GMachine$pop, 1, gmachine)));
-};
+var $author$project$GMachine$pushContext = A2(
+	$author$project$GMachine$runWith,
+	$author$project$GMachine$getTopVal,
+	F2(
+		function (val, m) {
+			return _Utils_Tuple2(
+				A3(
+					$elm$core$Basics$composeR,
+					$author$project$GMachine$pop(1),
+					A2(
+						$elm$core$Basics$composeR,
+						$author$project$GMachine$saveFrame,
+						$author$project$GMachine$stackLens.set(
+							_List_fromArray(
+								[val]))),
+					m),
+				$author$project$GMachine$NoUpdate);
+		}));
 var $author$project$GMachine$UndefinedSymbol = function (a) {
 	return {$: 'UndefinedSymbol', a: a};
 };
@@ -23251,27 +23234,19 @@ var $author$project$GMachine$stateTransition = F2(
 							case 'GApp':
 								var _v1 = _v0.a;
 								var _v2 = _v0.b.a;
-								return A3(
-									$author$project$GMachine$runWith,
-									$author$project$GMachine$pushContext,
-									F2(
-										function (m, _v3) {
-											return $author$project$GMachine$startUnwind(m);
-										}),
-									gmachine);
+								return A2(
+									$author$project$GMachine$andThen,
+									$author$project$GMachine$startUnwind,
+									$author$project$GMachine$pushContext(gmachine));
 							case 'GFunc':
-								var _v4 = _v0.a;
+								var _v3 = _v0.a;
 								var global = _v0.b.a.a;
-								return (!global.numFormals) ? A3(
-									$author$project$GMachine$runWith,
-									$author$project$GMachine$pushContext,
-									F2(
-										function (m, _v5) {
-											return A2($author$project$GMachine$enter, global, m);
-										}),
-									gmachine) : _Utils_Tuple2(gmachine, $author$project$GMachine$NoUpdate);
+								return (!global.numFormals) ? A2(
+									$author$project$GMachine$andThen,
+									$author$project$GMachine$enter(global),
+									$author$project$GMachine$pushContext(gmachine)) : $author$project$GMachine$doNothing(gmachine);
 							case 'GInt':
-								var _v6 = _v0.a;
+								var _v4 = _v0.a;
 								return $author$project$GMachine$doNothing(gmachine);
 							default:
 								break _v0$23;
@@ -23283,15 +23258,15 @@ var $author$project$GMachine$stateTransition = F2(
 					if (_v0.b.$ === 'Ok') {
 						switch (_v0.b.a.$) {
 							case 'GApp':
-								var _v7 = _v0.a;
-								var _v8 = _v0.b.a;
-								var n1 = _v8.a;
-								var n2 = _v8.b;
+								var _v5 = _v0.a;
+								var _v6 = _v0.b.a;
+								var n1 = _v6.a;
+								var n2 = _v6.b;
 								return _Utils_Tuple2(
 									A2($author$project$GMachine$push, n1, gmachine),
 									$author$project$GMachine$Unwound(n1));
 							case 'GFunc':
-								var _v9 = _v0.a;
+								var _v7 = _v0.a;
 								var global = _v0.b.a.a;
 								var stackLength = $elm$core$List$length(
 									$author$project$GMachine$getStack(gmachine));
@@ -23303,7 +23278,7 @@ var $author$project$GMachine$stateTransition = F2(
 									return A3($author$project$GMachine$runWith, getRedexRoot, $author$project$GMachine$return, gmachine);
 								}
 							case 'GInt':
-								var _v10 = _v0.a;
+								var _v8 = _v0.a;
 								return A3($author$project$GMachine$runWith, $author$project$GMachine$getTopVal, $author$project$GMachine$return, gmachine);
 							default:
 								break _v0$23;
@@ -23362,11 +23337,11 @@ var $author$project$GMachine$stateTransition = F2(
 						$author$project$GMachine$getFromStack(k),
 						F2(
 							function (addr, m) {
-								var _v11 = A2($author$project$GMachine$retrieveNode, addr, m);
-								if (_v11.$ === 'Ok') {
-									if (_v11.a.$ === 'GApp') {
-										var _v12 = _v11.a;
-										var arg = _v12.b;
+								var _v9 = A2($author$project$GMachine$retrieveNode, addr, m);
+								if (_v9.$ === 'Ok') {
+									if (_v9.a.$ === 'GApp') {
+										var _v10 = _v9.a;
+										var arg = _v10.b;
 										return _Utils_Tuple2(
 											A2($author$project$GMachine$push, arg, m),
 											$author$project$GMachine$NoUpdate);
@@ -23377,7 +23352,7 @@ var $author$project$GMachine$stateTransition = F2(
 												$author$project$GMachine$UnexpectedNode(addr)));
 									}
 								} else {
-									var err = _v11.a;
+									var err = _v9.a;
 									return _Utils_Tuple2(
 										m,
 										$author$project$GMachine$Crash(err));
@@ -23385,7 +23360,7 @@ var $author$project$GMachine$stateTransition = F2(
 							}),
 						gmachine);
 				case 'MKAP':
-					var _v13 = _v0.a;
+					var _v11 = _v0.a;
 					return A3(
 						$author$project$GMachine$runWith,
 						function (m) {
@@ -23395,9 +23370,9 @@ var $author$project$GMachine$stateTransition = F2(
 								$author$project$GMachine$getFromStack(1),
 								_Utils_Tuple2(m, m));
 						},
-						function (_v14) {
-							var n1 = _v14.a;
-							var n2 = _v14.b;
+						function (_v12) {
+							var n1 = _v12.a;
+							var n2 = _v12.b;
 							return A2(
 								$elm$core$Basics$composeR,
 								$author$project$GMachine$pop(2),
@@ -23407,7 +23382,7 @@ var $author$project$GMachine$stateTransition = F2(
 						gmachine);
 				case 'ADD':
 					if ((((_v0.b.$ === 'Ok') && (_v0.b.a.$ === 'GInt')) && (_v0.c.$ === 'Ok')) && (_v0.c.a.$ === 'GInt')) {
-						var _v15 = _v0.a;
+						var _v13 = _v0.a;
 						var x = _v0.b.a.a;
 						var y = _v0.c.a.a;
 						return A2(
@@ -23419,7 +23394,7 @@ var $author$project$GMachine$stateTransition = F2(
 					}
 				case 'SUB':
 					if ((((_v0.b.$ === 'Ok') && (_v0.b.a.$ === 'GInt')) && (_v0.c.$ === 'Ok')) && (_v0.c.a.$ === 'GInt')) {
-						var _v16 = _v0.a;
+						var _v14 = _v0.a;
 						var x = _v0.b.a.a;
 						var y = _v0.c.a.a;
 						return A2(
@@ -23431,7 +23406,7 @@ var $author$project$GMachine$stateTransition = F2(
 					}
 				case 'MUL':
 					if ((((_v0.b.$ === 'Ok') && (_v0.b.a.$ === 'GInt')) && (_v0.c.$ === 'Ok')) && (_v0.c.a.$ === 'GInt')) {
-						var _v17 = _v0.a;
+						var _v15 = _v0.a;
 						var x = _v0.b.a.a;
 						var y = _v0.c.a.a;
 						return A2(
@@ -23443,7 +23418,7 @@ var $author$project$GMachine$stateTransition = F2(
 					}
 				case 'DIV':
 					if ((((_v0.b.$ === 'Ok') && (_v0.b.a.$ === 'GInt')) && (_v0.c.$ === 'Ok')) && (_v0.c.a.$ === 'GInt')) {
-						var _v18 = _v0.a;
+						var _v16 = _v0.a;
 						var x = _v0.b.a.a;
 						var y = _v0.c.a.a;
 						return A2(
@@ -23455,7 +23430,7 @@ var $author$project$GMachine$stateTransition = F2(
 					}
 				case 'EQU':
 					if ((((_v0.b.$ === 'Ok') && (_v0.b.a.$ === 'GInt')) && (_v0.c.$ === 'Ok')) && (_v0.c.a.$ === 'GInt')) {
-						var _v19 = _v0.a;
+						var _v17 = _v0.a;
 						var x = _v0.b.a.a;
 						var y = _v0.c.a.a;
 						return A2(
@@ -26610,9 +26585,6 @@ var $author$project$Main$stepForwardButton = A2(
 		label: $author$project$Main$icon($1602$elm_feather$FeatherIcons$arrowRight),
 		onPress: $elm$core$Maybe$Just($author$project$Main$ClickedStepForward)
 	});
-var $mdgriffith$elm_ui$Element$explain = function (_v0) {
-	return $mdgriffith$elm_ui$Internal$Model$htmlClass('explain');
-};
 var $mdgriffith$elm_ui$Internal$Model$Max = F2(
 	function (a, b) {
 		return {$: 'Max', a: a, b: b};
@@ -26621,7 +26593,6 @@ var $mdgriffith$elm_ui$Element$maximum = F2(
 	function (i, l) {
 		return A2($mdgriffith$elm_ui$Internal$Model$Max, i, l);
 	});
-var $elm$core$Debug$todo = _Debug_todo;
 var $author$project$Backend$gCodeToString = function (instruction) {
 	switch (instruction.$) {
 		case 'ALLOC':
@@ -27767,6 +27738,24 @@ var $folkertdev$one_true_path_experiment$SubPath$arcLengthParameterizedHelper = 
 			}
 		}
 	});
+var $elm_community$list_extra$List$Extra$last = function (items) {
+	last:
+	while (true) {
+		if (!items.b) {
+			return $elm$core$Maybe$Nothing;
+		} else {
+			if (!items.b.b) {
+				var x = items.a;
+				return $elm$core$Maybe$Just(x);
+			} else {
+				var rest = items.b;
+				var $temp$items = rest;
+				items = $temp$items;
+				continue last;
+			}
+		}
+	}
+};
 var $ianmackenzie$elm_geometry$CubicSpline2d$endPoint = function (_v0) {
 	var spline = _v0.a;
 	return spline.fourthControlPoint;
@@ -30904,14 +30893,7 @@ var $author$project$Main$viewProgram = F2(
 									$mdgriffith$elm_ui$Element$width(
 									$mdgriffith$elm_ui$Element$fillPortion(5)),
 									$mdgriffith$elm_ui$Element$height(
-									A2($mdgriffith$elm_ui$Element$maximum, viewport.height, $mdgriffith$elm_ui$Element$fill)),
-									$mdgriffith$elm_ui$Element$explain(
-									_Debug_todo(
-										'Main',
-										{
-											start: {line: 631, column: 97},
-											end: {line: 631, column: 107}
-										}))
+									A2($mdgriffith$elm_ui$Element$maximum, viewport.height, $mdgriffith$elm_ui$Element$fill))
 								]),
 							$author$project$Main$viewMachine(machineView))
 						]));

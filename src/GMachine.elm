@@ -5,7 +5,7 @@ module GMachine exposing
   , GMachine
   , GNode(..), GGraph, HeapAddr
   , getChildren, getStack, getCodePtr
-  , isTermination, getCurrentRedexRoot
+  , isTermination, mainRedexRoot
   )
 
 import Basics.Extra exposing (flip)
@@ -69,7 +69,6 @@ type RuntimeError
   | StackException Int
   | UnexpectedNode HeapAddr
   | MissingLabel Int
-  | CannotSaveFrameWhileUnwinding
 
 {-| each state transition updates the abstract machine somehow.
 each of these variants signal a type of update to the machine
@@ -136,9 +135,6 @@ stackLens = Lens.compose accessCtx accessStack
 getStack : GMachine -> GStack
 getStack = stackLens.get
 
-getCurrentRedexRoot : GMachine -> Maybe HeapAddr
-getCurrentRedexRoot = getStack >> List.Extra.last
-
 {-| retrieve all the addresses referenced by the stack and dump
 -}
 stackPointers : GMachine -> List HeapAddr
@@ -168,16 +164,16 @@ currentInstruction = getCodePtr >> ZipList.current
 
 {-| save the current context to the dump to be restored later
 -}
-saveFrame : GMachine -> Result RuntimeError GMachine
+saveFrame : GMachine -> GMachine
 saveFrame gmachine = case gmachine.ctx of
-  Unwinding _ -> Err CannotSaveFrameWhileUnwinding -- this branch should never occur
-  StackFrame frame -> Ok {gmachine | dump=frame::gmachine.dump}
+  Unwinding _ -> gmachine -- this branch should never occur
+  StackFrame frame -> {gmachine | dump=frame::gmachine.dump}
 
 {-| save the current context and clear the stack except for the top value
--- TODO turn this into RuntimeResult
 -}
-pushContext : GMachine -> Result RuntimeError GMachine
-pushContext gmachine = Result.map2 push (getTopVal gmachine) (gmachine |> pop 1 |> saveFrame)
+pushContext : GMachine -> RuntimeResult
+pushContext = 
+  runWith getTopVal (\val m -> (m |> pop 1 >> saveFrame >> stackLens.set [val], NoUpdate))
 
 
 {-| restore the stack frame from the dump
@@ -213,7 +209,8 @@ runWith extract procedure machine = Result.Extra.unpack
 
 andThen : (GMachine -> RuntimeResult) -> RuntimeResult -> RuntimeResult
 andThen procedure (machine, previousUpdate) =
-  Tuple.mapSecond (Multiple previousUpdate) (procedure machine)
+  if isTermination previousUpdate then (machine, previousUpdate)
+  else Tuple.mapSecond (Multiple previousUpdate) (procedure machine)
 
 {-| start process of unwinding gmachine
 -}
@@ -343,13 +340,17 @@ stateTransition instruction gmachine =
     (ALLOC num, _, _) -> allocHoles num gmachine
 
     -- evaluate according to the node on the top of the stack
-    (EVAL, Ok (GApp _ _), _) -> runWith pushContext (\m _ -> startUnwind m) gmachine
+    (EVAL, Ok (GApp _ _), _) -> gmachine
+      |> pushContext
+      |> andThen startUnwind
     
     -- only perform the eval if the node is CAF (constant, no params)
     (EVAL, Ok (GFunc global), _) ->
       if global.numFormals == 0
-      then runWith pushContext (\m _ -> enter global m) gmachine
-      else (gmachine, NoUpdate)
+      then gmachine
+      |> pushContext
+      |> andThen (enter global)
+      else doNothing gmachine
 
     (EVAL, Ok (GInt _), _) -> doNothing gmachine
 
@@ -451,6 +452,9 @@ stateTransition instruction gmachine =
       getTopVal
       (\val m -> (m, Crash (UnexpectedNode val)))
       gmachine
+
+mainRedexRoot : HeapAddr
+mainRedexRoot = 0
 
 {-| set up a new machine by starting it on a function's code
 -}

@@ -145,3 +145,11 @@ main = if (1 == 0) 8 (square (if 1 9 0))
     """
     (TInt 81)
 
+factorial : Test
+factorial = testRun
+    """
+badfac x = if (x == 1) 1 (x * badfac (x-1))
+goodfac x acc = if (x == 1) acc (goodfac (x-1) (x*acc))
+main = goodfac 5 1 == badfac 5
+    """
+    (TInt 1)
