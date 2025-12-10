@@ -9535,7 +9535,7 @@ var $gampleman$elm_visualization$Hierarchy$NodeSize = function (a) {
 	return {$: 4, a: a};
 };
 var $gampleman$elm_visualization$Hierarchy$nodeSize = $gampleman$elm_visualization$Hierarchy$NodeSize;
-var $author$project$Main$nodeSize = 5;
+var $author$project$Main$nodeSize = 10;
 var $gampleman$elm_visualization$Hierarchy$ParentChildMargin = function (a) {
 	return {$: 2, a: a};
 };
@@ -11896,7 +11896,8 @@ var $author$project$Main$compileSourceCode = function (sourceCode) {
 		$author$project$GMachine$createMachine(sourceCode));
 };
 var $elm$browser$Browser$Dom$getViewport = _Browser_withWindow(_Browser_getViewport);
-var $author$project$Main$initialProgram = '\nbadfac x = if (x == 1) 1 (x * badfac (x-1))\ngoodfac x acc = if (x == 1) acc (goodfac (x-1) (x*acc))\nmain = goodfac 5  1 == badfac 5\n';
+var $author$project$Main$add1Program = '\nadd1 x = x + 1\nmain = add1 41\n';
+var $author$project$Main$initialProgram = $author$project$Main$add1Program;
 var $elm$core$Basics$round = _Basics_round;
 var $author$project$Main$init = _Utils_Tuple2(
 	A2(

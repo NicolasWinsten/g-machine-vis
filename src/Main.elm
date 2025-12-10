@@ -336,13 +336,36 @@ stepForwardMachineView model =
 stepBackMachineView : Model -> Model
 stepBackMachineView = Optional.modify accessHistory Nonempty.pop
 
-
-initialProgram =
-  """
+factorialProgram : String
+factorialProgram ="""
 badfac x = if (x == 1) 1 (x * badfac (x-1))
 goodfac x acc = if (x == 1) acc (goodfac (x-1) (x*acc))
 main = goodfac 5  1 == badfac 5
 """
+
+add1Program : String
+add1Program ="""
+add1 x = x + 1
+main = add1 41
+"""
+
+add2Program : String
+add2Program ="""
+add1 x = x + 1
+add2 y = add1 (add1 y)
+main = add2 40
+"""
+
+-- TODO an @ whose pointers reference the same child node only render one link
+-- I'd like to render two edges, one bent and one straight
+scaryProgram : String
+scaryProgram ="""
+f x = x x
+main = f f
+"""
+
+initialProgram = add1Program
+
 
 compileSourceCode : String -> Model -> Model
 compileSourceCode sourceCode = Result.Extra.unpack
@@ -456,7 +479,7 @@ avgDirOfIncomingEdges id layout =
   in Vec.toRecord avgDir
 
 
-nodeSize = 5
+nodeSize = 10
 
 nodeData : Node -> G.GNode
 nodeData = .label >> .value
